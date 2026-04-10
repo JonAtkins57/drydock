@@ -23,7 +23,7 @@ export interface PaginatedResponse<T> {
 
 // ── Quote Status ──────────────────────────────────────────────────
 
-export const quoteStatusValues = ['draft', 'sent', 'accepted', 'rejected', 'expired'] as const;
+export const quoteStatusValues = ['draft', 'sent', 'accepted', 'rejected', 'expired', 'executed'] as const;
 export type QuoteStatus = (typeof quoteStatusValues)[number];
 
 // ── Quote Line Input ──────────────────────────────────────────────
@@ -144,6 +144,27 @@ export const listInvoicesQuerySchema = paginationQuerySchema.extend({
 });
 
 export type ListInvoicesQuery = z.infer<typeof listInvoicesQuerySchema>;
+
+// ── DocuSign ──────────────────────────────────────────────────────
+
+const signerSchema = z.object({
+  email: z.string().email(),
+  name: z.string().min(1),
+  role: z.enum(['customer', 'internal']),
+  routingOrder: z.number().int().positive(),
+});
+
+export const sendDocuSignSchema = z.object({
+  recipients_config: z.object({
+    signers: z.array(signerSchema).min(1),
+  }),
+});
+
+export type SendDocuSignInput = z.infer<typeof sendDocuSignSchema>;
+
+// UploadSignedSchema: no body fields beyond the file (multipart)
+export const uploadSignedSchema = z.object({});
+export type UploadSignedInput = z.infer<typeof uploadSignedSchema>;
 
 // ── Record Payment ────────────────────────────────────────────────
 

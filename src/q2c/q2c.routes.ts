@@ -6,8 +6,10 @@ import { orderService } from './orders.service.js';
 import { invoiceService } from './invoices.service.js';
 import { billingService } from './billing.service.js';
 import { db } from '../db/connection.js';
-import { contacts } from '../db/schema/index.js';
+import { contacts, quotes } from '../db/schema/index.js';
 import { sendTransactionEmail } from '../email/email-log.service.js';
+import { logAction } from '../core/audit.service.js';
+import { sendEnvelope, getDocuSignConfig, DocuSignApiError } from '../integration/docusign.js';
 import {
   createQuoteSchema,
   updateQuoteSchema,
@@ -186,6 +188,127 @@ async function quoteRoutes(fastify: FastifyInstance): Promise<void> {
     const logResult = await sendTransactionEmail(tenantId, 'quote', id, toEmail, subject, html);
     if (!logResult.ok) return sendError(reply, logResult.error);
     return reply.send(logResult.value);
+  });
+
+  // POST /:id/actions/send-for-signature — send quote to DocuSign for e-signature
+  fastify.post('/:id/actions/send-for-signature', async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    const { tenantId, sub: userId } = request.currentUser;
+    const { id } = request.params;
+
+    const quoteResult = await quoteService.getQuote(tenantId, id);
+    if (!quoteResult.ok) return sendError(reply, quoteResult.error);
+    const quote = quoteResult.value;
+
+    if (!['draft', 'sent'].includes(quote.status)) {
+      return reply.status(409).send({
+        error: 'CONFLICT',
+        message: `Cannot send for signature from status: ${quote.status}`,
+      });
+    }
+
+    if (quote.docusignEnvelopeId) {
+      return reply.status(409).send({
+        error: 'CONFLICT',
+        message: `Quote already has a DocuSign envelope: ${quote.docusignEnvelopeId}`,
+      });
+    }
+
+    const config = getDocuSignConfig();
+    if (!config) {
+      return reply.status(500).send({
+        error: 'INTERNAL',
+        message: 'DocuSign is not configured (missing DOCUSIGN_ACCOUNT_ID, DOCUSIGN_BASE_URL, or DOCUSIGN_ACCESS_TOKEN)',
+      });
+    }
+
+    // Look up primary contact for signer details
+    const contactRows = await db
+      .select()
+      .from(contacts)
+      .where(
+        and(
+          eq(contacts.customerId, quote.customerId),
+          eq(contacts.tenantId, tenantId),
+          eq(contacts.isPrimary, true),
+          eq(contacts.isActive, true),
+          isNotNull(contacts.email),
+        ),
+      )
+      .limit(1);
+
+    const contact = contactRows[0];
+    if (!contact?.email) {
+      return reply.status(422).send({
+        error: 'VALIDATION',
+        message: 'No primary contact with email found for this customer',
+      });
+    }
+
+    const signerName = `${contact.firstName ?? ''} ${contact.lastName ?? ''}`.trim() || contact.email;
+
+    // Build a plain-text document representing the quote
+    const documentLines: string[] = [
+      `Quote: ${escapeHtml(quote.quoteNumber)}`,
+      `Name: ${escapeHtml(quote.name)}`,
+      `Total: $${(quote.totalAmount / 100).toFixed(2)}`,
+      `Valid Until: ${quote.validUntil ? new Date(quote.validUntil).toLocaleDateString('en-US') : 'N/A'}`,
+      '',
+      'Line Items:',
+      ...quote.lines.map(
+        (l) => `  ${l.description}  qty: ${l.quantity}  unit: $${(l.unitPrice / 100).toFixed(2)}  total: $${(l.amount / 100).toFixed(2)}`
+      ),
+      '',
+      'By signing below, you accept the terms of this quote.',
+      '',
+      'Signature: ___________________________  Date: ___________',
+    ];
+    const documentBase64 = Buffer.from(documentLines.join('\n'), 'utf-8').toString('base64');
+
+    try {
+      const envelopeResult = await sendEnvelope(config, {
+        subject: `Please sign Quote ${quote.quoteNumber}`,
+        signers: [{ name: signerName, email: contact.email, recipientId: '1' }],
+        documentBase64,
+        documentName: `Quote_${quote.quoteNumber}.txt`,
+        fileExtension: 'txt',
+        documentId: '1',
+      });
+
+      await db
+        .update(quotes)
+        .set({
+          docusignEnvelopeId: envelopeResult.envelopeId,
+          docusignStatus: envelopeResult.status,
+          updatedBy: userId,
+          updatedAt: new Date(),
+        })
+        .where(and(eq(quotes.id, id), eq(quotes.tenantId, tenantId)));
+
+      await logAction({
+        tenantId,
+        userId,
+        action: 'send_for_signature',
+        entityType: 'quote',
+        entityId: id,
+        changes: { envelopeId: envelopeResult.envelopeId, signerEmail: contact.email },
+      });
+
+      return reply.send({
+        envelopeId: envelopeResult.envelopeId,
+        status: envelopeResult.status,
+        signerEmail: contact.email,
+      });
+    } catch (e) {
+      if (e instanceof DocuSignApiError) {
+        return reply.status(502).send({
+          error: 'INTERNAL',
+          message: e.message,
+          details: { docusignResponse: e.responseBody },
+        });
+      }
+      const message = e instanceof Error ? e.message : 'Unexpected error calling DocuSign';
+      return reply.status(500).send({ error: 'INTERNAL', message });
+    }
   });
 }
 

@@ -22,6 +22,8 @@ import { p2pRoutes } from './p2p/p2p.routes.js';
 import bamboohrRoutes from './integration/bamboohr.routes.js';
 import apRoutes from './ap-portal/ap.routes.js';
 import attachmentRoutes from './core/attachments.routes.js';
+import { processWebhookEvent } from './q2c/docusign.service.js';
+import { validateDocuSignHmac } from './integration/docusign.js';
 import type { AppErrorCode } from './lib/result.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -115,6 +117,63 @@ async function buildServer() {
   await fastify.register(bamboohrRoutes);
   await fastify.register(apRoutes);
   await fastify.register(attachmentRoutes);
+
+  // ── DocuSign Connect Webhook ──────────────────────────────────────
+  // Encapsulated scope so the buffer content-type parser only applies here.
+  // Fastify v5 has no built-in rawBody support, so we override the JSON
+  // parser in this scope to capture the raw bytes needed for HMAC validation.
+  await fastify.register(async (scope) => {
+    scope.addContentTypeParser(
+      'application/json',
+      { parseAs: 'buffer' },
+      (_req, body, done) => {
+        try {
+          done(null, { _raw: body as Buffer, parsed: JSON.parse((body as Buffer).toString('utf8')) });
+        } catch (e) {
+          done(e as Error);
+        }
+      },
+    );
+
+    scope.post('/api/v1/webhooks/docusign', async (request, reply) => {
+      const bodyWrapper = request.body as { _raw: Buffer; parsed: unknown } | null;
+      const rawBody = bodyWrapper?._raw;
+      const parsed = bodyWrapper?.parsed as {
+        event?: string;
+        data?: { envelopeId?: string; envelopeSummary?: { status?: string } };
+      } | undefined;
+
+      const hmacKey = process.env.DOCUSIGN_HMAC_KEY;
+      if (hmacKey) {
+        const signature = (request.headers['x-docusign-signature-1'] as string | undefined) ?? '';
+        if (!rawBody || !validateDocuSignHmac(rawBody, signature, hmacKey)) {
+          return reply.status(401).send({ error: 'UNAUTHORIZED', message: 'Invalid DocuSign HMAC signature' });
+        }
+      }
+
+      if (!parsed?.event || !parsed?.data?.envelopeId) {
+        return reply.status(400).send({ error: 'BAD_REQUEST', message: 'Missing event or envelopeId' });
+      }
+
+      const result = await processWebhookEvent({
+        event: parsed.event,
+        data: {
+          envelopeId: parsed.data.envelopeId,
+          envelopeSummary: parsed.data.envelopeSummary,
+        },
+      });
+
+      if (!result.ok) {
+        // Return 200 to prevent DocuSign from retrying for NOT_FOUND (orphaned envelopes)
+        if (result.error.code === 'NOT_FOUND') {
+          return reply.status(200).send({ received: true, warning: result.error.message });
+        }
+        return reply.status(422).send({ error: result.error.code, message: result.error.message });
+      }
+
+      return reply.status(200).send({ received: true, quoteId: result.value.quoteId, docusignStatus: result.value.docusignStatus });
+    });
+  });
 
   // ── RFC 7807 Error Handler ────────────────────────────────────────
   const errorCodeToStatus: Record<AppErrorCode, number> = {

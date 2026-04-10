@@ -367,6 +367,80 @@ async function acceptQuote(
   return ok({ quote: updatedQuote, salesOrder: so });
 }
 
+// ── Execute Quote (DocuSign completion) → auto-create Sales Order ──
+
+async function executeQuote(
+  tenantId: string,
+  id: string,
+  userId: string,
+): Promise<Result<{ quote: QuoteRow; salesOrder: typeof salesOrders.$inferSelect }, AppError>> {
+  const existing = await getQuote(tenantId, id);
+  if (!existing.ok) return existing;
+
+  if (existing.value.status !== 'sent') {
+    return err({ code: 'CONFLICT', message: `Quote can only be executed from sent status, current: ${existing.value.status}` });
+  }
+
+  // Update quote status
+  const quoteRows = await db
+    .update(quotes)
+    .set({ status: 'executed', updatedBy: userId, updatedAt: new Date() })
+    .where(and(eq(quotes.id, id), eq(quotes.tenantId, tenantId)))
+    .returning();
+
+  const updatedQuote = quoteRows[0];
+  if (!updatedQuote) return err({ code: 'INTERNAL', message: 'Failed to execute quote' });
+
+  // Auto-create sales order
+  const orderNumResult = await generateNumber(tenantId, 'sales_order');
+  if (!orderNumResult.ok) return orderNumResult;
+
+  const soRows = await db
+    .insert(salesOrders)
+    .values({
+      tenantId,
+      orderNumber: orderNumResult.value,
+      customerId: existing.value.customerId,
+      quoteId: id,
+      status: 'draft',
+      totalAmount: existing.value.totalAmount,
+      notes: existing.value.notes,
+      createdBy: userId,
+      updatedBy: userId,
+    })
+    .returning();
+
+  const so = soRows[0];
+  if (!so) return err({ code: 'INTERNAL', message: 'Failed to create sales order from quote' });
+
+  // Copy quote lines to order lines
+  const olValues = existing.value.lines.map((ql) => ({
+    tenantId,
+    orderId: so.id,
+    lineNumber: ql.lineNumber,
+    itemId: ql.itemId ?? null,
+    description: ql.description,
+    quantity: ql.quantity,
+    unitPrice: ql.unitPrice,
+    amount: ql.amount,
+  }));
+
+  if (olValues.length > 0) {
+    await db.insert(orderLines).values(olValues);
+  }
+
+  await logAction({
+    tenantId,
+    userId,
+    action: 'execute',
+    entityType: 'quote',
+    entityId: id,
+    changes: { salesOrderId: so.id },
+  });
+
+  return ok({ quote: updatedQuote, salesOrder: so });
+}
+
 export const quoteService = {
   createQuote,
   getQuote,
@@ -374,4 +448,5 @@ export const quoteService = {
   updateQuote,
   sendQuote,
   acceptQuote,
+  executeQuote,
 };
