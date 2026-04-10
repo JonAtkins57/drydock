@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/store';
 import { endpoints } from '../lib/api';
 import Sidebar from '../components/Sidebar';
+import AttachmentsList from '../components/AttachmentsList';
 
 interface Invoice {
   id: string;
@@ -56,6 +57,7 @@ export default function Invoices() {
   const [showPayment, setShowPayment] = useState<Invoice | null>(null);
   const [paymentAmount, setPaymentAmount] = useState('');
   const [aging, setAging] = useState<ArAgingData | null>(null);
+  const [selectedAttachInvoice, setSelectedAttachInvoice] = useState<Invoice | null>(null);
 
   // Create form
   const [customer, setCustomer] = useState('');
@@ -356,6 +358,27 @@ export default function Invoices() {
           </div>
         )}
 
+        {/* Attachments Modal */}
+        {selectedAttachInvoice && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/60" onClick={() => setSelectedAttachInvoice(null)} />
+            <div className="relative bg-drydock-card border border-drydock-border rounded-lg p-6 w-full max-w-lg shadow-2xl">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-medium text-drydock-text">
+                  Attachments — {selectedAttachInvoice.invoiceNumber}
+                </h2>
+                <button
+                  onClick={() => setSelectedAttachInvoice(null)}
+                  className="text-drydock-steel hover:text-drydock-text transition-colors text-sm"
+                >
+                  Close
+                </button>
+              </div>
+              <AttachmentsList entityType="invoice" entityId={selectedAttachInvoice.id} />
+            </div>
+          </div>
+        )}
+
         {/* Table */}
         <div className="bg-drydock-card border border-drydock-border rounded-lg overflow-hidden">
           <table className="w-full">
@@ -369,6 +392,7 @@ export default function Invoices() {
                 <th className="text-right px-5 py-3 text-xs text-drydock-steel uppercase tracking-wider font-medium">Paid</th>
                 <th className="text-left px-5 py-3 text-xs text-drydock-steel uppercase tracking-wider font-medium">Created</th>
                 <th className="text-left px-5 py-3 text-xs text-drydock-steel uppercase tracking-wider font-medium">Actions</th>
+                <th className="text-left px-5 py-3 text-xs text-drydock-steel uppercase tracking-wider font-medium">Files</th>
               </tr>
             </thead>
             <tbody>
@@ -381,7 +405,7 @@ export default function Invoices() {
                   </tr>
                 ))
               ) : items.length === 0 ? (
-                <tr><td colSpan={8} className="px-5 py-8 text-center text-drydock-steel">No invoices found</td></tr>
+                <tr><td colSpan={9} className="px-5 py-8 text-center text-drydock-steel">No invoices found</td></tr>
               ) : (
                 items.map((inv) => {
                   const displayStatus = getDisplayStatus(inv);
@@ -417,6 +441,15 @@ export default function Invoices() {
                             {a.label}
                           </button>
                         ))}
+                      </td>
+                      <td className="px-5 py-3">
+                        <button
+                          onClick={() => setSelectedAttachInvoice(inv)}
+                          className="text-xs px-3 py-1 bg-drydock-border/50 text-drydock-steel border border-drydock-border
+                            rounded hover:text-drydock-text hover:border-drydock-steel transition-colors"
+                        >
+                          Attachments
+                        </button>
                       </td>
                     </tr>
                   );
