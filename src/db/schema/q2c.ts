@@ -50,6 +50,8 @@ export const quotes = q2cSchema.table('quotes', {
   notes: text('notes'),
   version: integer('version').notNull().default(1),
   parentQuoteId: uuid('parent_quote_id'),
+  docusignEnvelopeId: text('docusign_envelope_id'),
+  docusignStatus: text('docusign_status'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   createdBy: uuid('created_by'),

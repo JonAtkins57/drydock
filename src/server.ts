@@ -22,6 +22,8 @@ import { p2pRoutes } from './p2p/p2p.routes.js';
 import bamboohrRoutes from './integration/bamboohr.routes.js';
 import apRoutes from './ap-portal/ap.routes.js';
 import attachmentRoutes from './core/attachments.routes.js';
+import { processWebhookEvent } from './q2c/docusign.service.js';
+import { validateDocuSignHmac } from './integration/docusign.js';
 import type { AppErrorCode } from './lib/result.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -115,6 +117,49 @@ async function buildServer() {
   await fastify.register(bamboohrRoutes);
   await fastify.register(apRoutes);
   await fastify.register(attachmentRoutes);
+
+  // ── DocuSign Connect Webhook ──────────────────────────────────────
+  // DocuSign sends envelope status change events to this endpoint.
+  // HMAC-SHA256 signature is validated when DOCUSIGN_HMAC_KEY is set.
+  fastify.post('/api/v1/webhooks/docusign', {
+    config: { rawBody: true },
+  }, async (request, reply) => {
+    const hmacKey = process.env.DOCUSIGN_HMAC_KEY;
+    if (hmacKey) {
+      const signature = (request.headers['x-docusign-signature-1'] as string | undefined) ?? '';
+      const rawBody = (request as unknown as { rawBody?: Buffer }).rawBody;
+      if (!rawBody || !validateDocuSignHmac(rawBody, signature, hmacKey)) {
+        return reply.status(401).send({ error: 'UNAUTHORIZED', message: 'Invalid DocuSign HMAC signature' });
+      }
+    }
+
+    const payload = request.body as {
+      event?: string;
+      data?: { envelopeId?: string; envelopeSummary?: { status?: string } };
+    };
+
+    if (!payload?.event || !payload?.data?.envelopeId) {
+      return reply.status(400).send({ error: 'BAD_REQUEST', message: 'Missing event or envelopeId' });
+    }
+
+    const result = await processWebhookEvent({
+      event: payload.event,
+      data: {
+        envelopeId: payload.data.envelopeId,
+        envelopeSummary: payload.data.envelopeSummary,
+      },
+    });
+
+    if (!result.ok) {
+      // Return 200 to prevent DocuSign from retrying for NOT_FOUND (orphaned envelopes)
+      if (result.error.code === 'NOT_FOUND') {
+        return reply.status(200).send({ received: true, warning: result.error.message });
+      }
+      return reply.status(422).send({ error: result.error.code, message: result.error.message });
+    }
+
+    return reply.status(200).send({ received: true, quoteId: result.value.quoteId, docusignStatus: result.value.docusignStatus });
+  });
 
   // ── RFC 7807 Error Handler ────────────────────────────────────────
   const errorCodeToStatus: Record<AppErrorCode, number> = {
