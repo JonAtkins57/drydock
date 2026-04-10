@@ -1,4 +1,4 @@
-ALTER TYPE "drydock_p2p"."po_status" ADD VALUE 'sent';
+ALTER TYPE "drydock_p2p"."po_status" ADD VALUE IF NOT EXISTS 'sent';
 --> statement-breakpoint
 CREATE TABLE "drydock_p2p"."email_log" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,

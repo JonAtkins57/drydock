@@ -477,9 +477,9 @@ export async function sendPOToVendor(
   const html = renderPOEmailHtml({
     poNumber: po.poNumber,
     vendorName: vendor.name,
-    orderDate: po.orderDate.toISOString().split('T')[0] ?? po.orderDate.toISOString(),
+    orderDate: po.orderDate.toISOString().substring(0, 10),
     expectedDelivery: po.expectedDelivery
-      ? (po.expectedDelivery.toISOString().split('T')[0] ?? null)
+      ? po.expectedDelivery.toISOString().substring(0, 10)
       : null,
     lines: po.lines.map((l) => ({
       description: l.description,
@@ -489,7 +489,9 @@ export async function sendPOToVendor(
     totalAmount: po.totalAmount,
   });
 
-  // Send via SES
+  // Send email first. If it fails, the PO stays 'draft' and the caller can retry.
+  // Committing 'sent' before a successful send would leave the PO stuck — the
+  // draft→sent guard (line 424) has no retry path for a failed delivery.
   const emailResult = await sendEmail({
     to: recipientEmail,
     subject: `Purchase Order ${po.poNumber} from DryDock`,
@@ -500,20 +502,17 @@ export async function sendPOToVendor(
 
   const { messageId } = emailResult.value;
 
-  // Insert email log
-  await db.insert(emailLog).values({
-    tenantId,
-    poId: id,
-    recipientEmail,
-    sesMessageId: messageId,
-    sentBy: userId,
-  });
+  // Email confirmed sent — now commit DB atomically with the known messageId.
+  await db.transaction(async (tx) => {
+    await tx
+      .insert(emailLog)
+      .values({ tenantId, poId: id, recipientEmail, sesMessageId: messageId, sentBy: userId });
 
-  // Transition PO status to 'sent'
-  await db
-    .update(purchaseOrders)
-    .set({ status: 'sent', updatedBy: userId, updatedAt: new Date() })
-    .where(and(eq(purchaseOrders.id, id), eq(purchaseOrders.tenantId, tenantId)));
+    await tx
+      .update(purchaseOrders)
+      .set({ status: 'sent', updatedBy: userId, updatedAt: new Date() })
+      .where(and(eq(purchaseOrders.id, id), eq(purchaseOrders.tenantId, tenantId)));
+  });
 
   await logAction({
     tenantId,
