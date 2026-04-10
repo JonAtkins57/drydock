@@ -1,4 +1,4 @@
-import { pgSchema, uuid, text, boolean, jsonb, integer, timestamp, pgEnum } from 'drizzle-orm/pg-core';
+import { pgSchema, uuid, text, boolean, jsonb, integer, timestamp } from 'drizzle-orm/pg-core';
 
 export const coreSchema = pgSchema('drydock_core');
 

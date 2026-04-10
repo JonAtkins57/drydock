@@ -1,5 +1,5 @@
 import { pgSchema, uuid, text, boolean, jsonb, integer, timestamp, numeric } from 'drizzle-orm/pg-core';
-import { tenants, users } from './core';
+// Relations to core schema are via tenant_id UUIDs (no FK to avoid cross-schema issues with drizzle)
 
 export const masterSchema = pgSchema('drydock_master');
 

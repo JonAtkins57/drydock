@@ -1,5 +1,5 @@
 import { pgSchema, uuid, text, boolean, jsonb, integer, bigint, timestamp } from 'drizzle-orm/pg-core';
-import { legalEntities, departments, locations, customers, vendors, projects, costCenters } from './master';
+import { legalEntities, departments, locations, customers, vendors, projects, costCenters } from './master.js';
 
 export const glSchema = pgSchema('drydock_gl');
 

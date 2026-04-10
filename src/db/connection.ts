@@ -1,4 +1,4 @@
-import { drizzle } from 'drizzle-orm/node-postgres';
+import { drizzle, NodePgDatabase } from 'drizzle-orm/node-postgres';
 import pg from 'pg';
 import * as schema from './schema/index.js';
 
@@ -10,11 +10,13 @@ const pool = new Pool({
 
 export const db = drizzle(pool, { schema });
 
-export async function withTenant<T>(tenantId: string, fn: (db: typeof import('./connection.js').db) => Promise<T>): Promise<T> {
+export type DrydockDb = NodePgDatabase<typeof schema>;
+
+export async function withTenant<T>(tenantId: string, fn: (db: DrydockDb) => Promise<T>): Promise<T> {
   const client = await pool.connect();
   try {
     await client.query(`SET app.current_tenant = '${tenantId}'`);
-    const tenantDb = drizzle(client, { schema });
+    const tenantDb = drizzle(client, { schema }) as DrydockDb;
     const result = await fn(tenantDb);
     return result;
   } finally {

@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DryDock — Operational Platform</title>
+  <meta name="description" content="Multi-tenant CRM, ERP, AP Portal, Financial Close, and Planning platform">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --dark: #0f2027;
+      --mid: #1a3a4a;
+      --steel: #5b7b8a;
+      --light: #c8dde6;
+      --accent: #4ecdc4;
+      --accent-dim: #3ba89f;
+      --bg: #0a1a22;
+      --card: #0f2a35;
+      --border: #1d4455;
+      --text: #e8f0f4;
+      --text-dim: #8ab4c7;
+    }
+
+    body {
+      font-family: 'Anthropic Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 2rem;
+      background: radial-gradient(ellipse at 50% 30%, #0f303d 0%, var(--bg) 70%);
+      position: relative;
+    }
+
+    .hero::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    }
+
+    .logo {
+      width: 280px;
+      margin-bottom: 2rem;
+      filter: drop-shadow(0 0 40px rgba(78, 205, 196, 0.15));
+    }
+
+    .tagline {
+      font-size: 1.1rem;
+      color: var(--text-dim);
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      margin-bottom: 1.5rem;
+      font-weight: 400;
+    }
+
+    .subtitle {
+      font-size: 1.6rem;
+      color: var(--light);
+      max-width: 700px;
+      font-weight: 300;
+      line-height: 1.5;
+      margin-bottom: 3rem;
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 1.2rem;
+      background: rgba(78, 205, 196, 0.08);
+      border: 1px solid rgba(78, 205, 196, 0.25);
+      border-radius: 100px;
+      font-size: 0.85rem;
+      color: var(--accent);
+      letter-spacing: 1px;
+    }
+
+    .status-badge::before {
+      content: '';
+      width: 8px;
+      height: 8px;
+      background: var(--accent);
+      border-radius: 50%;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    .modules {
+      padding: 6rem 2rem;
+      background: var(--dark);
+    }
+
+    .modules-grid {
+      max-width: 1100px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1.5rem;
+    }
+
+    .section-title {
+      text-align: center;
+      font-size: 2rem;
+      font-weight: 400;
+      color: var(--light);
+      margin-bottom: 1rem;
+      letter-spacing: 2px;
+    }
+
+    .section-subtitle {
+      text-align: center;
+      color: var(--text-dim);
+      margin-bottom: 4rem;
+      font-size: 1rem;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 2rem;
+      transition: border-color 0.3s, transform 0.3s;
+    }
+
+    .card:hover {
+      border-color: var(--accent);
+      transform: translateY(-2px);
+    }
+
+    .card h3 {
+      font-size: 1.1rem;
+      font-weight: 500;
+      color: var(--text);
+      margin-bottom: 0.75rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .card h3 span {
+      font-size: 1.3rem;
+    }
+
+    .card p {
+      color: var(--text-dim);
+      font-size: 0.9rem;
+      line-height: 1.7;
+    }
+
+    .workflows {
+      padding: 6rem 2rem;
+      background: var(--bg);
+    }
+
+    .workflow-list {
+      max-width: 900px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+
+    .workflow-item {
+      display: flex;
+      align-items: center;
+      gap: 2rem;
+      padding: 1.5rem 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .workflow-num {
+      width: 48px;
+      height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--accent);
+      border-radius: 50%;
+      color: var(--accent);
+      font-size: 1rem;
+      font-weight: 500;
+      flex-shrink: 0;
+    }
+
+    .workflow-item h4 {
+      font-weight: 500;
+      color: var(--text);
+      margin-bottom: 0.25rem;
+    }
+
+    .workflow-item p {
+      color: var(--text-dim);
+      font-size: 0.85rem;
+    }
+
+    .tech {
+      padding: 6rem 2rem;
+      background: var(--dark);
+    }
+
+    .tech-list {
+      max-width: 900px;
+      margin: 0 auto;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      justify-content: center;
+    }
+
+    .tech-pill {
+      padding: 0.5rem 1rem;
+      background: rgba(78, 205, 196, 0.06);
+      border: 1px solid var(--border);
+      border-radius: 100px;
+      font-size: 0.8rem;
+      color: var(--text-dim);
+      letter-spacing: 0.5px;
+    }
+
+    .family {
+      padding: 6rem 2rem;
+      background: var(--bg);
+    }
+
+    .family-grid {
+      max-width: 900px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1.5rem;
+    }
+
+    .family-item {
+      text-align: center;
+      padding: 2rem 1rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      transition: border-color 0.3s;
+    }
+
+    .family-item.active {
+      border-color: var(--accent);
+      background: rgba(78, 205, 196, 0.05);
+    }
+
+    .family-item h4 {
+      font-size: 1rem;
+      font-weight: 500;
+      margin-bottom: 0.5rem;
+    }
+
+    .family-item p {
+      font-size: 0.75rem;
+      color: var(--text-dim);
+      line-height: 1.5;
+    }
+
+    footer {
+      text-align: center;
+      padding: 3rem 2rem;
+      background: var(--bg);
+      border-top: 1px solid var(--border);
+      color: var(--steel);
+      font-size: 0.8rem;
+      letter-spacing: 1px;
+    }
+
+    @media (max-width: 768px) {
+      .family-grid { grid-template-columns: repeat(2, 1fr); }
+      .subtitle { font-size: 1.2rem; }
+      .logo { width: 200px; }
+    }
+  </style>
+</head>
+<body>
+
+<section class="hero">
+  <img src="/assets/drydock-logo.svg" alt="DryDock" class="logo">
+  <p class="tagline">Operational Platform</p>
+  <p class="subtitle">
+    Multi-tenant CRM, ERP, AP Portal, Financial Close, and Operational Planning
+    — unified in a single platform built for mid-market companies.
+  </p>
+  <div class="status-badge">Phase 1 — Building</div>
+</section>
+
+<section class="modules">
+  <h2 class="section-title">Modules</h2>
+  <p class="section-subtitle">Everything finance, operations, and sales teams need — integrated from day one.</p>
+  <div class="modules-grid">
+    <div class="card">
+      <h3><span>&#9783;</span> Quote-to-Cash</h3>
+      <p>Quotes, orders, contracts, billing schedules, invoicing, AR tracking, and collections. Advance and arrears billing, milestone and usage-based, with amendment history.</p>
+    </div>
+    <div class="card">
+      <h3><span>&#9881;</span> Procure-to-Pay</h3>
+      <p>Requisitions, purchase orders, goods receipt, and three-way matching. Approval routing with configurable thresholds and delegation.</p>
+    </div>
+    <div class="card">
+      <h3><span>&#9993;</span> AP Portal</h3>
+      <p>Email inbox ingestion, OCR via AWS Textract, confidence scoring, learned GL coding, PO matching with tolerance rules, and a queue-based processing console.</p>
+    </div>
+    <div class="card">
+      <h3><span>&#9878;</span> General Ledger</h3>
+      <p>Double-entry posting engine with balance validation, chart of accounts, period management, journal approval workflows, and trial balance reporting.</p>
+    </div>
+    <div class="card">
+      <h3><span>&#9733;</span> CRM</h3>
+      <p>Lead and opportunity tracking, account hierarchy, contact management, activity logging, pipeline visibility, and transaction-level email tracking.</p>
+    </div>
+    <div class="card">
+      <h3><span>&#9881;</span> Metadata Engine</h3>
+      <p>Custom fields, custom transaction types, picklists, and validation rules. Tenant-configurable without code changes. The foundation everything else builds on.</p>
+    </div>
+    <div class="card">
+      <h3><span>&#8644;</span> Workflow Engine</h3>
+      <p>State machine definitions, conditional transitions, serial/parallel approval chains, delegation, escalation, and event-driven triggers.</p>
+    </div>
+    <div class="card">
+      <h3><span>&#128279;</span> Integrations</h3>
+      <p>BambooHR, DocuSign, and a common integration framework with field mapping, sync logging, error queues, and external key management.</p>
+    </div>
+    <div class="card">
+      <h3><span>&#128203;</span> Audit Trail</h3>
+      <p>Append-only, immutable action log. Every create, update, delete, approve, post, and reverse is recorded with before/after snapshots. No exceptions.</p>
+    </div>
+  </div>
+</section>
+
+<section class="workflows">
+  <h2 class="section-title">Core Workflows</h2>
+  <p class="section-subtitle">Three end-to-end business processes, deeply integrated.</p>
+  <div class="workflow-list">
+    <div class="workflow-item">
+      <div class="workflow-num">Q2C</div>
+      <div>
+        <h4>Quote &rarr; Order &rarr; Invoice &rarr; Cash</h4>
+        <p>From initial quote with e-signature through billing schedule generation, invoice delivery, AR aging, and cash receipt application.</p>
+      </div>
+    </div>
+    <div class="workflow-item">
+      <div class="workflow-num">P2P</div>
+      <div>
+        <h4>Requisition &rarr; PO &rarr; Receipt &rarr; Invoice &rarr; Payment</h4>
+        <p>From purchase request through approval, dispatch, goods receipt, AP invoice matching, coding, and GL posting.</p>
+      </div>
+    </div>
+    <div class="workflow-item">
+      <div class="workflow-num">R2R</div>
+      <div>
+        <h4>Record &rarr; Reconcile &rarr; Close &rarr; Report</h4>
+        <p>Journal entry creation, approval, posting with balance validation, period management, and financial reporting.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="tech">
+  <h2 class="section-title">Built With</h2>
+  <p class="section-subtitle">Modern stack, enterprise reliability.</p>
+  <div class="tech-list">
+    <span class="tech-pill">TypeScript</span>
+    <span class="tech-pill">Node.js</span>
+    <span class="tech-pill">Fastify</span>
+    <span class="tech-pill">PostgreSQL</span>
+    <span class="tech-pill">Drizzle ORM</span>
+    <span class="tech-pill">Row Level Security</span>
+    <span class="tech-pill">React</span>
+    <span class="tech-pill">Vite</span>
+    <span class="tech-pill">Tailwind CSS</span>
+    <span class="tech-pill">BullMQ</span>
+    <span class="tech-pill">Redis</span>
+    <span class="tech-pill">AWS Textract</span>
+    <span class="tech-pill">JWT / OIDC</span>
+    <span class="tech-pill">OpenAPI</span>
+    <span class="tech-pill">Vitest</span>
+    <span class="tech-pill">Playwright</span>
+  </div>
+</section>
+
+<section class="family">
+  <h2 class="section-title">Product Family</h2>
+  <p class="section-subtitle">Four products that share data and feed each other.</p>
+  <div class="family-grid">
+    <div class="family-item">
+      <h4>Shipyard</h4>
+      <p>NL-to-production-code across the full SDLC</p>
+    </div>
+    <div class="family-item">
+      <h4>Signals</h4>
+      <p>Operational intelligence &amp; workforce analytics</p>
+    </div>
+    <div class="family-item">
+      <h4>Maestro</h4>
+      <p>Agentic AI &amp; AI coworkers</p>
+    </div>
+    <div class="family-item active">
+      <h4>DryDock</h4>
+      <p>CRM + ERP + AP Portal + Financial Close</p>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <p>&copy; 2026 Thrasoz / Atkins Professional Services</p>
+</footer>
+
+</body>
+</html>
