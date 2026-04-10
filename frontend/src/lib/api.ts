@@ -38,6 +38,42 @@ export class ApiError extends Error {
   }
 }
 
+export interface AgingBucket {
+  count: number;
+  totalAmount: number;
+  totalOutstanding: number;
+}
+
+export interface StatementInvoice {
+  id: string;
+  invoiceNumber: string;
+  dueDate: string;
+  totalAmount: number;
+  paidAmount: number;
+  outstanding: number;
+  status: string;
+}
+
+export interface StatementResponse {
+  customer_id: string;
+  customer_name: string;
+  statement_date: string;
+  from: string;
+  to: string;
+  open_invoices: StatementInvoice[];
+  credit_memos: unknown[];
+  unapplied_payments: unknown[];
+  aging_summary: {
+    current: AgingBucket;
+    '1_30': AgingBucket;
+    '31_60': AgingBucket;
+    '61_90': AgingBucket;
+    '90plus': AgingBucket;
+  };
+  total_outstanding: number;
+  truncated: boolean;
+}
+
 export const endpoints = {
   login: (email: string, password: string) =>
     api<{ accessToken: string; refreshToken: string; expiresIn: number }>('/auth/login', {
@@ -177,6 +213,15 @@ export const endpoints = {
   invoiceAction: (id: string, action: string, body?: unknown) =>
     api(`/invoices/${id}/actions/${action}`, { method: 'POST', body }),
   arAging: () => api<unknown>('/reports/ar-aging'),
+
+  // Q2C: Customer Statements
+  customerStatement: (id: string, from: string, to: string) =>
+    api<StatementResponse>(`/customers/${id}/statement?from=${from}&to=${to}`),
+  sendStatement: (id: string, toEmail?: string) =>
+    api<{ messageId: string; sentTo: string }>(`/customers/${id}/actions/send-statement`, {
+      method: 'POST',
+      body: toEmail !== undefined ? { toEmail } : {},
+    }),
 
   // Q2C: Billing Plans
   billingPlans: (page = 1, pageSize = 25) =>
