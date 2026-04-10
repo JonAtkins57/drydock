@@ -61,6 +61,8 @@ const SECTIONS: NavSection[] = [
       { label: 'Periods', path: '/periods' },
       { label: 'Journal Entries', path: '/journal-entries' },
       { label: 'Trial Balance', path: '/trial-balance' },
+      { label: 'Income Statement', path: '/reports/income-statement' },
+      { label: 'Balance Sheet', path: '/reports/balance-sheet' },
     ],
   },
   {

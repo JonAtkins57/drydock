@@ -26,6 +26,8 @@ import SalesOrders from './pages/SalesOrders';
 import Invoices from './pages/Invoices';
 import BillingPlans from './pages/BillingPlans';
 import Statement from './pages/Statement';
+import IncomeStatement from './pages/reports/IncomeStatement';
+import BalanceSheet from './pages/reports/BalanceSheet';
 
 export default function App() {
   const { init, token } = useAuth();
@@ -63,6 +65,8 @@ export default function App() {
       <Route path="/invoices" element={<Invoices />} />
       <Route path="/billing-plans" element={<BillingPlans />} />
       <Route path="/customers/:id/statement" element={<Statement />} />
+      <Route path="/reports/income-statement" element={<IncomeStatement />} />
+      <Route path="/reports/balance-sheet" element={<BalanceSheet />} />
       <Route path="/" element={token ? <Navigate to="/dashboard" /> : <Landing />} />
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>
