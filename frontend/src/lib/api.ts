@@ -111,4 +111,42 @@ export const endpoints = {
     ),
   createCustomField: (data: unknown) => api('/custom-fields', { method: 'POST', body: data }),
   workflows: (entityType: string) => api<unknown>(`/workflows/${entityType}`),
+
+  // P2P: Requisitions
+  requisitions: (page = 1, pageSize = 25) =>
+    api<{ data: unknown[]; meta: { total: number; page: number; pageSize: number; totalPages: number } }>(
+      `/requisitions?page=${page}&pageSize=${pageSize}`
+    ),
+  createRequisition: (data: unknown) => api('/requisitions', { method: 'POST', body: data }),
+  requisitionAction: (id: string, action: string) =>
+    api(`/requisitions/${id}/actions/${action}`, { method: 'POST' }),
+
+  // P2P: Purchase Orders
+  purchaseOrders: (page = 1, pageSize = 25) =>
+    api<{ data: unknown[]; meta: { total: number; page: number; pageSize: number; totalPages: number } }>(
+      `/purchase-orders?page=${page}&pageSize=${pageSize}`
+    ),
+  createPO: (data: unknown) => api('/purchase-orders', { method: 'POST', body: data }),
+  poAction: (id: string, action: string) =>
+    api(`/purchase-orders/${id}/actions/${action}`, { method: 'POST' }),
+  receivePO: (id: string, data: unknown) =>
+    api(`/purchase-orders/${id}/actions/receive`, { method: 'POST', body: data }),
+
+  // AP Processing
+  apInvoices: (page = 1, pageSize = 25, status?: string) =>
+    api<{ data: unknown[]; meta: { total: number; page: number; pageSize: number; totalPages: number } }>(
+      `/ap-invoices?page=${page}&pageSize=${pageSize}${status ? `&filter={"status":"${status}"}` : ''}`
+    ),
+  apInvoiceQueue: () => api<unknown>('/ap-invoices/queue'),
+  apInvoiceDetail: (id: string) => api<unknown>(`/ap-invoices/${id}`),
+  apInvoiceAction: (id: string, action: string) =>
+    api(`/ap-invoices/${id}/actions/${action}`, { method: 'POST' }),
+  apApplyCoding: (id: string, data: unknown) =>
+    api(`/ap-invoices/${id}/actions/code`, { method: 'POST', body: data }),
+
+  // Goods Receipts
+  goodsReceipts: (page = 1, pageSize = 25) =>
+    api<{ data: unknown[]; meta: { total: number; page: number; pageSize: number; totalPages: number } }>(
+      `/goods-receipts?page=${page}&pageSize=${pageSize}`
+    ),
 };

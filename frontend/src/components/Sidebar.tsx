@@ -32,6 +32,20 @@ const SECTIONS: NavSection[] = [
     ],
   },
   {
+    label: 'P2P',
+    items: [
+      { label: 'Requisitions', path: '/requisitions' },
+      { label: 'Purchase Orders', path: '/purchase-orders' },
+      { label: 'Receipts', path: '/goods-receipts' },
+    ],
+  },
+  {
+    label: 'AP',
+    items: [
+      { label: 'AP Console', path: '/ap-console' },
+    ],
+  },
+  {
     label: 'Finance',
     items: [
       { label: 'GL Accounts', path: '/accounts' },

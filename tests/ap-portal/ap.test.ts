@@ -446,6 +446,10 @@ describe('AP Portal — PO Matching Service', () => {
           createdAt: now,
         }]),
       );
+      // Mock: update invoice to link PO
+      (db.update as ReturnType<typeof vi.fn>).mockReturnValueOnce(
+        buildUpdateChain([mockInvoice({ poId: PO_ID })]),
+      );
 
       const { matchToPO } = await import('../../src/ap-portal/matching.service');
 
@@ -476,6 +480,9 @@ describe('AP Portal — PO Matching Service', () => {
           createdAt: now,
         }]),
       );
+      (db.update as ReturnType<typeof vi.fn>).mockReturnValueOnce(
+        buildUpdateChain([mockInvoice({ poId: PO_ID })]),
+      );
 
       const { matchToPO } = await import('../../src/ap-portal/matching.service');
 
@@ -504,6 +511,9 @@ describe('AP Portal — PO Matching Service', () => {
           notes: 'Price variance: 2000 cents (20.00%)',
           createdAt: now,
         }]),
+      );
+      (db.update as ReturnType<typeof vi.fn>).mockReturnValueOnce(
+        buildUpdateChain([mockInvoice({ poId: PO_ID })]),
       );
 
       const { matchToPO } = await import('../../src/ap-portal/matching.service');
@@ -535,6 +545,9 @@ describe('AP Portal — PO Matching Service', () => {
           notes: expect.any(String),
           createdAt: now,
         }]),
+      );
+      (db.update as ReturnType<typeof vi.fn>).mockReturnValueOnce(
+        buildUpdateChain([mockInvoice({ poId: PO_ID })]),
       );
 
       const { threeWayMatch } = await import('../../src/ap-portal/matching.service');
@@ -569,6 +582,9 @@ describe('AP Portal — PO Matching Service', () => {
           notes: expect.any(String),
           createdAt: now,
         }]),
+      );
+      (db.update as ReturnType<typeof vi.fn>).mockReturnValueOnce(
+        buildUpdateChain([mockInvoice({ poId: PO_ID })]),
       );
 
       const { threeWayMatch } = await import('../../src/ap-portal/matching.service');

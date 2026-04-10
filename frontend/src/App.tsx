@@ -16,6 +16,11 @@ import TrialBalance from './pages/TrialBalance';
 import CustomFields from './pages/CustomFields';
 import Workflows from './pages/Workflows';
 import { EmployeesPage, ItemsPage, LocationsPage, ProjectsPage } from './pages/MasterDataPages';
+import Requisitions from './pages/Requisitions';
+import PurchaseOrders from './pages/PurchaseOrders';
+import ApProcessingConsole from './pages/ApProcessingConsole';
+import ApInvoiceDetail from './pages/ApInvoiceDetail';
+import GoodsReceipts from './pages/GoodsReceipts';
 
 export default function App() {
   const { init, token } = useAuth();
@@ -43,6 +48,11 @@ export default function App() {
       <Route path="/items" element={<ItemsPage />} />
       <Route path="/locations" element={<LocationsPage />} />
       <Route path="/projects" element={<ProjectsPage />} />
+      <Route path="/requisitions" element={<Requisitions />} />
+      <Route path="/purchase-orders" element={<PurchaseOrders />} />
+      <Route path="/ap-console" element={<ApProcessingConsole />} />
+      <Route path="/ap-invoices/:id" element={<ApInvoiceDetail />} />
+      <Route path="/goods-receipts" element={<GoodsReceipts />} />
       <Route path="/" element={token ? <Navigate to="/dashboard" /> : <Landing />} />
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>
