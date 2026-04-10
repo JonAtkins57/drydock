@@ -358,6 +358,27 @@ export default function Invoices() {
           </div>
         )}
 
+        {/* Attachments Modal */}
+        {selectedAttachInvoice && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/60" onClick={() => setSelectedAttachInvoice(null)} />
+            <div className="relative bg-drydock-card border border-drydock-border rounded-lg p-6 w-full max-w-lg shadow-2xl">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-medium text-drydock-text">
+                  Attachments — {selectedAttachInvoice.invoiceNumber}
+                </h2>
+                <button
+                  onClick={() => setSelectedAttachInvoice(null)}
+                  className="text-drydock-steel hover:text-drydock-text transition-colors text-sm"
+                >
+                  Close
+                </button>
+              </div>
+              <AttachmentsList entityType="invoice" entityId={selectedAttachInvoice.id} />
+            </div>
+          </div>
+        )}
+
         {/* Table */}
         <div className="bg-drydock-card border border-drydock-border rounded-lg overflow-hidden">
           <table className="w-full">
@@ -420,6 +441,15 @@ export default function Invoices() {
                             {a.label}
                           </button>
                         ))}
+                      </td>
+                      <td className="px-5 py-3">
+                        <button
+                          onClick={() => setSelectedAttachInvoice(inv)}
+                          className="text-xs px-3 py-1 bg-drydock-border/50 text-drydock-steel border border-drydock-border
+                            rounded hover:text-drydock-text hover:border-drydock-steel transition-colors"
+                        >
+                          Attachments
+                        </button>
                       </td>
                     </tr>
                   );
