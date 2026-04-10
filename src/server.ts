@@ -72,15 +72,28 @@ async function buildServer() {
   // ── Static Files ──────────────────────────────────────────────────
   const projectRoot = process.cwd();
 
+  // Serve React app build
+  const appDir = path.join(projectRoot, 'src', 'public', 'app');
   await fastify.register(fastifyStatic, {
-    root: path.join(projectRoot, 'assets'),
-    prefix: '/assets/',
+    root: appDir,
+    prefix: '/',
     decorateReply: true,
   });
 
-  // Landing page
-  fastify.get('/', async (_request, reply) => {
-    return reply.sendFile('index.html', path.join(projectRoot, 'src', 'public'));
+  // Serve assets (logo, etc.)
+  await fastify.register(fastifyStatic, {
+    root: path.join(projectRoot, 'assets'),
+    prefix: '/assets/',
+    decorateReply: false,
+  });
+
+  // SPA fallback — serve index.html for all non-API, non-asset routes
+  fastify.setNotFoundHandler(async (request, reply) => {
+    const url = request.url;
+    if (url.startsWith('/api/') || url.startsWith('/docs')) {
+      return reply.status(404).send({ error: 'Not found' });
+    }
+    return reply.sendFile('index.html', appDir);
   });
 
   // ── Routes ────────────────────────────────────────────────────────

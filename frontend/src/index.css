@@ -1,0 +1,14 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  margin: 0;
+  background: #0a1a22;
+  color: #e8f0f4;
+}
+
+input:-webkit-autofill {
+  -webkit-box-shadow: 0 0 0px 1000px #0f2a35 inset !important;
+  -webkit-text-fill-color: #e8f0f4 !important;
+}
