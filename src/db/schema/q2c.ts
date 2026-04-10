@@ -1,11 +1,11 @@
-import { pgSchema, uuid, text, integer, timestamp } from 'drizzle-orm/pg-core';
+import { pgSchema, uuid, text, integer, timestamp, jsonb } from 'drizzle-orm/pg-core';
 
 export const q2cSchema = pgSchema('drydock_q2c');
 
 // ── Enums ─────────────────────────────────────────────────────────
 
 export const quoteStatusEnum = q2cSchema.enum('quote_status', [
-  'draft', 'sent', 'accepted', 'rejected', 'expired',
+  'draft', 'sent', 'accepted', 'rejected', 'expired', 'executed',
 ]);
 
 export const orderStatusEnum = q2cSchema.enum('order_status', [
@@ -164,6 +164,25 @@ export const billingPlans = q2cSchema.table('billing_plans', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   createdBy: uuid('created_by'),
   updatedBy: uuid('updated_by'),
+});
+
+// ── DocuSign Envelopes ────────────────────────────────────────────
+
+export const docusignEnvelopeStatusEnum = q2cSchema.enum('docusign_envelope_status', [
+  'sent', 'delivered', 'completed', 'voided', 'declined',
+]);
+
+export const docusignEnvelopes = q2cSchema.table('docusign_envelopes', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  quoteId: uuid('quote_id').notNull().references(() => quotes.id),
+  envelopeId: text('envelope_id').notNull().unique(),
+  status: docusignEnvelopeStatusEnum('status').notNull(),
+  recipientsConfig: jsonb('recipients_config').notNull(),
+  s3KeySignedDoc: text('s3_key_signed_doc'),
+  sentBy: uuid('sent_by'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
 // ── Billing Schedule Lines ────────────────────────────────────────
