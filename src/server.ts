@@ -15,6 +15,7 @@ import glRoutes from './gl/gl.routes.js';
 import { customerRoutes } from './master/customers.routes.js';
 import { vendorRoutes } from './master/vendors.routes.js';
 import { registerEntityRoutes } from './master/entities.routes.js';
+import { crmRoutes } from './crm/crm.routes.js';
 import type { AppErrorCode } from './lib/result.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -97,6 +98,7 @@ async function buildServer() {
   await fastify.register(customerRoutes, { prefix: '/api/v1/customers' });
   await fastify.register(vendorRoutes, { prefix: '/api/v1/vendors' });
   await fastify.register(registerEntityRoutes);
+  await fastify.register(crmRoutes);
 
   // ── RFC 7807 Error Handler ────────────────────────────────────────
   const errorCodeToStatus: Record<AppErrorCode, number> = {

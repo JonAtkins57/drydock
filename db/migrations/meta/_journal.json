@@ -8,6 +8,13 @@
       "when": 1775841974557,
       "tag": "0000_last_metal_master",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1775846197785,
+      "tag": "0001_crm",
+      "breakpoints": true
     }
   ]
 }

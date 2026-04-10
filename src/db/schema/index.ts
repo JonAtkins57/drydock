@@ -3,3 +3,4 @@ export * from './master.js';
 export * from './gl.js';
 export * from './audit.js';
 export * from './integration.js';
+export * from './crm.js';
