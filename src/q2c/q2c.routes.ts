@@ -1,9 +1,13 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
+import { eq, and, isNotNull } from 'drizzle-orm';
 import { authenticateHook, setTenantContext } from '../core/auth.middleware.js';
 import { quoteService } from './quotes.service.js';
 import { orderService } from './orders.service.js';
 import { invoiceService } from './invoices.service.js';
 import { billingService } from './billing.service.js';
+import { db } from '../db/connection.js';
+import { contacts } from '../db/schema/index.js';
+import { sendTransactionEmail } from '../email/email-log.service.js';
 import {
   createQuoteSchema,
   updateQuoteSchema,
@@ -126,6 +130,49 @@ async function quoteRoutes(fastify: FastifyInstance): Promise<void> {
     const result = await quoteService.acceptQuote(tenantId, id, userId);
     if (!result.ok) return sendError(reply, result.error);
     return reply.status(201).send(result.value);
+  });
+
+  // POST /:id/actions/send-email — email quote to primary contact
+  fastify.post('/:id/actions/send-email', async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    const { tenantId } = request.currentUser;
+    const { id } = request.params;
+
+    const quoteResult = await quoteService.getQuote(tenantId, id);
+    if (!quoteResult.ok) return sendError(reply, quoteResult.error);
+    const quote = quoteResult.value;
+
+    const contactRows = await db
+      .select()
+      .from(contacts)
+      .where(
+        and(
+          eq(contacts.customerId, quote.customerId),
+          eq(contacts.tenantId, tenantId),
+          eq(contacts.isPrimary, true),
+          eq(contacts.isActive, true),
+          isNotNull(contacts.email),
+        ),
+      )
+      .limit(1);
+
+    const toEmail = contactRows[0]?.email ?? '';
+
+    const totalDollars = '$' + (quote.totalAmount / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const validUntilStr = quote.validUntil ? new Date(quote.validUntil).toLocaleDateString('en-US') : 'N/A';
+    const subject = `Quote ${quote.quoteNumber}: ${quote.name}`;
+    const html = `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px;">
+        <h1 style="color: #1a3a4a; font-size: 24px;">Quote ${quote.quoteNumber}</h1>
+        <p style="color: #4a5568;"><strong>Name:</strong> ${quote.name}</p>
+        <p style="color: #4a5568;"><strong>Total:</strong> ${totalDollars}</p>
+        <p style="color: #4a5568;"><strong>Valid Until:</strong> ${validUntilStr}</p>
+        <p style="color: #718096; font-size: 13px; margin-top: 30px;">Thrasoz / DryDock Operational Platform</p>
+      </div>
+    `;
+
+    const logResult = await sendTransactionEmail(tenantId, 'quote', id, toEmail, subject, html);
+    if (!logResult.ok) return sendError(reply, logResult.error);
+    return reply.send(logResult.value);
   });
 }
 
@@ -277,6 +324,48 @@ async function invoiceRoutes(fastify: FastifyInstance): Promise<void> {
     const result = await invoiceService.recordPayment(tenantId, id, parsed.data.amount, userId);
     if (!result.ok) return sendError(reply, result.error);
     return reply.send(result.value);
+  });
+
+  // POST /:id/actions/send-email — email invoice to primary contact
+  fastify.post('/:id/actions/send-email', async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    const { tenantId } = request.currentUser;
+    const { id } = request.params;
+
+    const invoiceResult = await invoiceService.getInvoice(tenantId, id);
+    if (!invoiceResult.ok) return sendError(reply, invoiceResult.error);
+    const invoice = invoiceResult.value;
+
+    const contactRows = await db
+      .select()
+      .from(contacts)
+      .where(
+        and(
+          eq(contacts.customerId, invoice.customerId),
+          eq(contacts.tenantId, tenantId),
+          eq(contacts.isPrimary, true),
+          eq(contacts.isActive, true),
+          isNotNull(contacts.email),
+        ),
+      )
+      .limit(1);
+
+    const toEmail = contactRows[0]?.email ?? '';
+
+    const totalDollars = '$' + (invoice.totalAmount / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const dueDateStr = new Date(invoice.dueDate).toLocaleDateString('en-US');
+    const subject = `Invoice ${invoice.invoiceNumber} — Due ${dueDateStr}`;
+    const html = `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px;">
+        <h1 style="color: #1a3a4a; font-size: 24px;">Invoice ${invoice.invoiceNumber}</h1>
+        <p style="color: #4a5568;"><strong>Total:</strong> ${totalDollars}</p>
+        <p style="color: #4a5568;"><strong>Due Date:</strong> ${dueDateStr}</p>
+        <p style="color: #718096; font-size: 13px; margin-top: 30px;">Thrasoz / DryDock Operational Platform</p>
+      </div>
+    `;
+
+    const logResult = await sendTransactionEmail(tenantId, 'invoice', id, toEmail, subject, html);
+    if (!logResult.ok) return sendError(reply, logResult.error);
+    return reply.send(logResult.value);
   });
 }
 
