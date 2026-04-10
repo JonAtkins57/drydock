@@ -4,7 +4,9 @@ import { useAuth } from './lib/store';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Customers from './pages/Customers';
+import Vendors from './pages/Vendors';
 import Accounts from './pages/Accounts';
+import Periods from './pages/Periods';
 
 export default function App() {
   const { init, token } = useAuth();
@@ -18,7 +20,9 @@ export default function App() {
       <Route path="/login" element={<Login />} />
       <Route path="/dashboard" element={<Dashboard />} />
       <Route path="/customers" element={<Customers />} />
+      <Route path="/vendors" element={<Vendors />} />
       <Route path="/accounts" element={<Accounts />} />
+      <Route path="/periods" element={<Periods />} />
       <Route path="/" element={token ? <Navigate to="/dashboard" /> : <Navigate to="/login" />} />
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>

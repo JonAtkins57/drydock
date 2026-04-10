@@ -3,35 +3,33 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/store';
 import { endpoints } from '../lib/api';
 import Sidebar from '../components/Sidebar';
-import CreateCustomerModal from '../components/CreateCustomerModal';
 
-interface Customer {
+interface Vendor {
   id: string;
   name: string;
-  customerNumber: string;
+  vendorNumber: string;
   status: string;
   currency: string;
   createdAt: string;
 }
 
-export default function Customers() {
+export default function Vendors() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [vendors, setVendors] = useState<Vendor[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [showCreate, setShowCreate] = useState(false);
 
   useEffect(() => {
     if (!user) { navigate('/login'); return; }
-    loadCustomers();
+    load();
   }, [user, navigate]);
 
-  const loadCustomers = async () => {
+  const load = async () => {
     try {
-      const res = await endpoints.customers(1, 50);
-      setCustomers(res.data as Customer[]);
-      setTotal(res.meta.total);
+      const res = await endpoints.vendors(1, 50);
+      setVendors(res.data as Vendor[]);
+      setTotal((res.meta as { total: number }).total);
     } catch { /* */ }
     setLoading(false);
   };
@@ -44,23 +42,10 @@ export default function Customers() {
       <main className="flex-1 p-8">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-2xl font-medium text-drydock-text">Customers</h1>
+            <h1 className="text-2xl font-medium text-drydock-text">Vendors</h1>
             <p className="text-drydock-text-dim text-sm mt-1">{total} total</p>
           </div>
-          <button
-            onClick={() => setShowCreate(true)}
-            className="px-4 py-2 text-sm bg-drydock-accent hover:bg-drydock-accent-dim
-              text-drydock-dark font-medium rounded-md transition-colors"
-          >
-            + New Customer
-          </button>
         </div>
-
-        <CreateCustomerModal
-          open={showCreate}
-          onClose={() => setShowCreate(false)}
-          onCreated={loadCustomers}
-        />
 
         <div className="bg-drydock-card border border-drydock-border rounded-lg overflow-hidden">
           <table className="w-full">
@@ -78,34 +63,26 @@ export default function Customers() {
                 Array.from({ length: 3 }).map((_, i) => (
                   <tr key={i} className="border-b border-drydock-border/50">
                     {Array.from({ length: 5 }).map((_, j) => (
-                      <td key={j} className="px-5 py-3">
-                        <div className="h-4 bg-drydock-border/30 rounded animate-pulse w-24" />
-                      </td>
+                      <td key={j} className="px-5 py-3"><div className="h-4 bg-drydock-border/30 rounded animate-pulse w-24" /></td>
                     ))}
                   </tr>
                 ))
-              ) : customers.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="px-5 py-8 text-center text-drydock-steel">
-                    No customers found
-                  </td>
-                </tr>
+              ) : vendors.length === 0 ? (
+                <tr><td colSpan={5} className="px-5 py-8 text-center text-drydock-steel">No vendors found</td></tr>
               ) : (
-                customers.map((c) => (
-                  <tr key={c.id} className="border-b border-drydock-border/50 hover:bg-drydock-bg/50 transition-colors">
-                    <td className="px-5 py-3 text-sm font-mono text-drydock-accent">{c.customerNumber}</td>
-                    <td className="px-5 py-3 text-sm text-drydock-text">{c.name}</td>
+                vendors.map((v) => (
+                  <tr key={v.id} className="border-b border-drydock-border/50 hover:bg-drydock-bg/50 transition-colors">
+                    <td className="px-5 py-3 text-sm font-mono text-drydock-accent">{v.vendorNumber}</td>
+                    <td className="px-5 py-3 text-sm text-drydock-text">{v.name}</td>
                     <td className="px-5 py-3">
                       <span className={`text-xs px-2 py-0.5 rounded-full ${
-                        c.status === 'active'
+                        v.status === 'active'
                           ? 'bg-green-900/30 text-green-400 border border-green-700/30'
                           : 'bg-gray-800 text-gray-400 border border-gray-700'
-                      }`}>
-                        {c.status}
-                      </span>
+                      }`}>{v.status}</span>
                     </td>
-                    <td className="px-5 py-3 text-sm text-drydock-text-dim">{c.currency}</td>
-                    <td className="px-5 py-3 text-sm text-drydock-steel">{new Date(c.createdAt).toLocaleDateString()}</td>
+                    <td className="px-5 py-3 text-sm text-drydock-text-dim">{v.currency}</td>
+                    <td className="px-5 py-3 text-sm text-drydock-steel">{new Date(v.createdAt).toLocaleDateString()}</td>
                   </tr>
                 ))
               )}
