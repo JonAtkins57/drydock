@@ -518,8 +518,7 @@ describe('Order Service', () => {
       };
 
       mocks.mockReturning
-        .mockResolvedValueOnce([mockInvoice])  // insert invoice
-        .mockResolvedValueOnce([]);             // insert invoice lines
+        .mockResolvedValueOnce([mockInvoice]);  // insert invoice
 
       const result = await orderService.generateInvoice(TENANT_ID, ORDER_ID, USER_ID);
 
