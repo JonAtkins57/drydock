@@ -4,7 +4,8 @@ import { createHmac } from 'crypto';
 
 export interface DocuSignConfig {
   accountId: string;
-  baseUrl: string;
+  integrationKey: string;
+  basePath: string;
   accessToken: string;
 }
 
@@ -69,7 +70,7 @@ export async function sendEnvelope(
   config: DocuSignConfig,
   options: SendEnvelopeOptions,
 ): Promise<EnvelopeResult> {
-  const url = `${config.baseUrl}/accounts/${config.accountId}/envelopes`;
+  const url = `${config.basePath}/accounts/${config.accountId}/envelopes`;
 
   const body = {
     emailSubject: options.subject,
@@ -129,7 +130,7 @@ export async function getEnvelopeStatus(
   config: DocuSignConfig,
   envelopeId: string,
 ): Promise<{ envelopeId: string; status: string; statusChangedDateTime: string }> {
-  const url = `${config.baseUrl}/accounts/${config.accountId}/envelopes/${envelopeId}`;
+  const url = `${config.basePath}/accounts/${config.accountId}/envelopes/${envelopeId}`;
 
   const res = await fetch(url, {
     method: 'GET',
@@ -151,14 +152,47 @@ export async function getEnvelopeStatus(
   return res.json() as Promise<{ envelopeId: string; status: string; statusChangedDateTime: string }>;
 }
 
+// ── Download Envelope Document ────────────────────────────────────
+
+/**
+ * Downloads the signed combined document PDF from a completed DocuSign envelope.
+ * Uses documentId 'combined' to retrieve all documents merged into one PDF.
+ */
+export async function downloadEnvelopeDocument(
+  config: DocuSignConfig,
+  envelopeId: string,
+  documentId = 'combined',
+): Promise<Buffer> {
+  const url = `${config.basePath}/accounts/${config.accountId}/envelopes/${envelopeId}/documents/${documentId}`;
+
+  const res = await fetch(url, {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${config.accessToken}`,
+    },
+  });
+
+  if (!res.ok) {
+    const errorBody = await res.json().catch(() => ({}));
+    throw new DocuSignApiError(
+      res.status,
+      `DocuSign document download error ${res.status}: ${res.statusText}`,
+      errorBody,
+    );
+  }
+
+  return Buffer.from(await res.arrayBuffer());
+}
+
 // ── Config Loader ─────────────────────────────────────────────────
 
 export function getDocuSignConfig(): DocuSignConfig | null {
   const accountId = process.env.DOCUSIGN_ACCOUNT_ID;
-  const baseUrl = process.env.DOCUSIGN_BASE_URL;
+  const integrationKey = process.env.DOCUSIGN_INTEGRATION_KEY;
+  const basePath = process.env.DOCUSIGN_BASE_PATH;
   const accessToken = process.env.DOCUSIGN_ACCESS_TOKEN;
 
-  if (!accountId || !baseUrl || !accessToken) return null;
+  if (!accountId || !integrationKey || !basePath || !accessToken) return null;
 
-  return { accountId, baseUrl, accessToken };
+  return { accountId, integrationKey, basePath, accessToken };
 }

@@ -1,11 +1,17 @@
 import { eq } from 'drizzle-orm';
 import { db } from '../db/connection.js';
-import { quotes } from '../db/schema/index.js';
+import { quotes, docusignEnvelopes } from '../db/schema/index.js';
 import { logAction } from '../core/audit.service.js';
+import { getDocuSignConfig, downloadEnvelopeDocument } from '../integration/docusign.js';
+import { uploadFile } from '../core/s3.js';
 import { ok, err, type Result, type AppError } from '../lib/result.js';
+import { quoteService } from './quotes.service.js';
 
 // DocuSign envelope statuses that map to quote state changes
 const TERMINAL_STATUSES = new Set(['completed', 'declined', 'voided']);
+
+// Valid values for the docusign_envelopes.status enum column
+const VALID_ENVELOPE_STATUSES = new Set(['sent', 'delivered', 'completed', 'voided', 'declined']);
 
 export interface WebhookEventPayload {
   event: string;
@@ -17,14 +23,30 @@ export interface WebhookEventPayload {
   };
 }
 
+// Maps DocuSign Connect event names to granular audit action labels
+function auditActionForEvent(event: string): string {
+  switch (event) {
+    case 'envelope-viewed':
+    case 'envelope-delivered': return 'docusign_viewed';
+    case 'recipient-viewed': return 'docusign_signer_viewed';
+    case 'recipient-completed': return 'docusign_signer_completed';
+    case 'envelope-completed': return 'docusign_completed';
+    case 'envelope-declined': return 'docusign_declined';
+    case 'envelope-voided': return 'docusign_voided';
+    default: return 'docusign_webhook';
+  }
+}
+
 /**
  * Processes a DocuSign Connect webhook event.
- * Looks up the quote by envelopeId, updates docusignStatus,
- * and transitions quote status to 'executed' on completion.
+ * Looks up the quote by envelopeId, updates docusignStatus on quotes,
+ * keeps the docusign_envelopes record in sync, downloads and stores the
+ * signed PDF to S3 on completion (best-effort), and transitions quote
+ * status to 'executed' (with auto-created sales order) on completion.
  */
 export async function processWebhookEvent(
   payload: WebhookEventPayload,
-): Promise<Result<{ quoteId: string; docusignStatus: string }, AppError>> {
+): Promise<Result<{ quoteId: string; docusignStatus: string; s3Key?: string }, AppError>> {
   const envelopeId = payload.data.envelopeId;
   const envelopeStatus = payload.data.envelopeSummary?.status ?? payload.event.replace('envelope-', '');
 
@@ -44,31 +66,76 @@ export async function processWebhookEvent(
     return err({ code: 'NOT_FOUND', message: `No quote found for envelope ${envelopeId}` });
   }
 
-  const updateData: Record<string, unknown> = {
-    docusignStatus: envelopeStatus,
-    updatedAt: new Date(),
-  };
-
-  // Auto-execute quote on DocuSign completion
-  if (envelopeStatus === 'completed') {
-    updateData['status'] = 'executed';
-  }
-
+  // Update docusign status on the quote
   await db
     .update(quotes)
-    .set(updateData)
+    .set({ docusignStatus: envelopeStatus, updatedAt: new Date() })
     .where(eq(quotes.id, quote.id));
+
+  // Keep docusign_envelopes record in sync (single source of truth for envelope detail)
+  const envelopeRows = await db
+    .select()
+    .from(docusignEnvelopes)
+    .where(eq(docusignEnvelopes.envelopeId, envelopeId))
+    .limit(1);
+  const envelopeRecord = envelopeRows[0];
+
+  if (envelopeRecord && VALID_ENVELOPE_STATUSES.has(envelopeStatus)) {
+    await db
+      .update(docusignEnvelopes)
+      .set({
+        status: envelopeStatus as 'sent' | 'delivered' | 'completed' | 'voided' | 'declined',
+        updatedAt: new Date(),
+      })
+      .where(eq(docusignEnvelopes.id, envelopeRecord.id));
+  }
+
+  // On completion: download signed PDF and store to S3 (best-effort — don't fail the webhook)
+  let s3Key: string | undefined;
+  if (envelopeStatus === 'completed') {
+    try {
+      const config = getDocuSignConfig();
+      if (config) {
+        const pdfBuffer = await downloadEnvelopeDocument(config, envelopeId);
+        s3Key = await uploadFile(
+          quote.tenantId,
+          'quote',
+          quote.id,
+          `signed-${envelopeId}.pdf`,
+          pdfBuffer,
+          'application/pdf',
+        );
+        if (envelopeRecord) {
+          await db
+            .update(docusignEnvelopes)
+            .set({ s3KeySignedDoc: s3Key, updatedAt: new Date() })
+            .where(eq(docusignEnvelopes.id, envelopeRecord.id));
+        }
+      }
+    } catch {
+      // Signed doc storage is best-effort — don't fail webhook processing
+    }
+  }
+
+  // Auto-execute quote on DocuSign completion — goes through quoteService
+  // so that the sales order is created and audit is logged consistently.
+  if (envelopeStatus === 'completed' && quote.status === 'sent') {
+    const execResult = await quoteService.executeQuote(quote.tenantId, quote.id, 'system');
+    if (!execResult.ok) {
+      return err(execResult.error);
+    }
+  }
 
   await logAction({
     tenantId: quote.tenantId,
     userId: null,
-    action: 'docusign_webhook',
+    action: auditActionForEvent(payload.event),
     entityType: 'quote',
     entityId: quote.id,
-    changes: { event: payload.event, envelopeId, envelopeStatus },
+    changes: { event: payload.event, envelopeId, envelopeStatus, ...(s3Key ? { s3Key } : {}) },
   });
 
-  return ok({ quoteId: quote.id, docusignStatus: envelopeStatus });
+  return ok({ quoteId: quote.id, docusignStatus: envelopeStatus, s3Key });
 }
 
 /**
