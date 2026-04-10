@@ -1,5 +1,5 @@
 import { pgSchema, uuid, text, boolean, integer, timestamp } from 'drizzle-orm/pg-core';
-import { customers } from './master';
+import { customers } from './master.js';
 
 export const crmSchema = pgSchema('drydock_crm');
 

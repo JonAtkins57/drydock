@@ -16,6 +16,10 @@ import { customerRoutes } from './master/customers.routes.js';
 import { vendorRoutes } from './master/vendors.routes.js';
 import { registerEntityRoutes } from './master/entities.routes.js';
 import { crmRoutes } from './crm/crm.routes.js';
+import { q2cRoutes } from './q2c/q2c.routes.js';
+import { p2pRoutes } from './p2p/p2p.routes.js';
+import bamboohrRoutes from './integration/bamboohr.routes.js';
+import apRoutes from './ap-portal/ap.routes.js';
 import type { AppErrorCode } from './lib/result.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -99,6 +103,10 @@ async function buildServer() {
   await fastify.register(vendorRoutes, { prefix: '/api/v1/vendors' });
   await fastify.register(registerEntityRoutes);
   await fastify.register(crmRoutes);
+  await fastify.register(q2cRoutes);
+  await fastify.register(p2pRoutes);
+  await fastify.register(bamboohrRoutes);
+  await fastify.register(apRoutes);
 
   // ── RFC 7807 Error Handler ────────────────────────────────────────
   const errorCodeToStatus: Record<AppErrorCode, number> = {

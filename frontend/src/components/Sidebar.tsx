@@ -27,6 +27,8 @@ const SECTIONS: NavSection[] = [
       { label: 'Departments', path: '/departments' },
       { label: 'Employees', path: '/employees' },
       { label: 'Items', path: '/items' },
+      { label: 'Locations', path: '/locations' },
+      { label: 'Projects', path: '/projects' },
     ],
   },
   {
@@ -36,6 +38,13 @@ const SECTIONS: NavSection[] = [
       { label: 'Periods', path: '/periods' },
       { label: 'Journal Entries', path: '/journal-entries' },
       { label: 'Trial Balance', path: '/trial-balance' },
+    ],
+  },
+  {
+    label: 'Settings',
+    items: [
+      { label: 'Custom Fields', path: '/custom-fields' },
+      { label: 'Workflows', path: '/workflows' },
     ],
   },
 ];

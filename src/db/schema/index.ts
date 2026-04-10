@@ -4,3 +4,6 @@ export * from './gl.js';
 export * from './audit.js';
 export * from './integration.js';
 export * from './crm.js';
+export * from './q2c.js';
+export * from './p2p.js';
+export * from './ap.js';

@@ -12,6 +12,9 @@ import Opportunities from './pages/Opportunities';
 import Activities from './pages/Activities';
 import JournalEntries from './pages/JournalEntries';
 import TrialBalance from './pages/TrialBalance';
+import CustomFields from './pages/CustomFields';
+import Workflows from './pages/Workflows';
+import { EmployeesPage, ItemsPage, LocationsPage, ProjectsPage } from './pages/MasterDataPages';
 
 export default function App() {
   const { init, token } = useAuth();
@@ -33,6 +36,12 @@ export default function App() {
       <Route path="/activities" element={<Activities />} />
       <Route path="/journal-entries" element={<JournalEntries />} />
       <Route path="/trial-balance" element={<TrialBalance />} />
+      <Route path="/custom-fields" element={<CustomFields />} />
+      <Route path="/workflows" element={<Workflows />} />
+      <Route path="/employees" element={<EmployeesPage />} />
+      <Route path="/items" element={<ItemsPage />} />
+      <Route path="/locations" element={<LocationsPage />} />
+      <Route path="/projects" element={<ProjectsPage />} />
       <Route path="/" element={token ? <Navigate to="/dashboard" /> : <Navigate to="/login" />} />
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>

@@ -85,4 +85,30 @@ export const endpoints = {
   },
   createVendor: (data: unknown) => api('/vendors', { method: 'POST', body: data }),
   createAccount: (data: unknown) => api('/accounts', { method: 'POST', body: data }),
+  employees: (page = 1, pageSize = 25) =>
+    api<{ data: unknown[]; meta: { total: number; page: number; pageSize: number; totalPages: number } }>(
+      `/employees?page=${page}&pageSize=${pageSize}`
+    ),
+  createEmployee: (data: unknown) => api('/employees', { method: 'POST', body: data }),
+  items: (page = 1, pageSize = 25) =>
+    api<{ data: unknown[]; meta: { total: number; page: number; pageSize: number; totalPages: number } }>(
+      `/items?page=${page}&pageSize=${pageSize}`
+    ),
+  createItem: (data: unknown) => api('/items', { method: 'POST', body: data }),
+  locations: (page = 1, pageSize = 25) =>
+    api<{ data: unknown[]; meta: { total: number; page: number; pageSize: number; totalPages: number } }>(
+      `/locations?page=${page}&pageSize=${pageSize}`
+    ),
+  createLocation: (data: unknown) => api('/locations', { method: 'POST', body: data }),
+  projects: (page = 1, pageSize = 25) =>
+    api<{ data: unknown[]; meta: { total: number; page: number; pageSize: number; totalPages: number } }>(
+      `/projects?page=${page}&pageSize=${pageSize}`
+    ),
+  createProject: (data: unknown) => api('/projects', { method: 'POST', body: data }),
+  customFields: (page = 1, pageSize = 100) =>
+    api<{ data: unknown[]; total: number; page: number; pageSize: number }>(
+      `/custom-fields?page=${page}&pageSize=${pageSize}`
+    ),
+  createCustomField: (data: unknown) => api('/custom-fields', { method: 'POST', body: data }),
+  workflows: (entityType: string) => api<unknown>(`/workflows/${entityType}`),
 };
