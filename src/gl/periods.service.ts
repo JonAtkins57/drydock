@@ -1,6 +1,6 @@
-import { eq, and, sql, asc } from 'drizzle-orm';
+import { eq, and, sql, asc, ne } from 'drizzle-orm';
 import { db } from '../db/connection.js';
-import { accountingPeriods } from '../db/schema/index.js';
+import { accountingPeriods, closeChecklists, closeChecklistItems } from '../db/schema/index.js';
 import { ok, err, type Result, type AppError } from '../lib/result.js';
 import { logAction } from '../core/audit.service.js';
 import type { CreatePeriodInput, PeriodStatus } from './gl.schemas.js';
@@ -140,6 +140,35 @@ export async function updatePeriodStatus(
       code: 'VALIDATION',
       message: `Cannot transition from '${currentStatus}' to '${newStatus}'. Allowed: ${allowedTransitions?.join(', ') ?? 'none'}`,
     });
+  }
+
+  // Gate soft_close → closed: all checklist items must be signed_off (if a checklist exists)
+  if (currentStatus === 'soft_close' && newStatus === 'closed') {
+    const [checklist] = await db
+      .select({ id: closeChecklists.id })
+      .from(closeChecklists)
+      .where(and(eq(closeChecklists.tenantId, tenantId), eq(closeChecklists.periodId, id)))
+      .limit(1);
+
+    if (checklist) {
+      const unsignedItems = await db
+        .select({ label: closeChecklistItems.label })
+        .from(closeChecklistItems)
+        .where(
+          and(
+            eq(closeChecklistItems.checklistId, checklist.id),
+            ne(closeChecklistItems.status, 'signed_off'),
+          ),
+        );
+
+      if (unsignedItems.length > 0) {
+        const labels = unsignedItems.map((i) => i.label).join(', ');
+        return err({
+          code: 'VALIDATION',
+          message: `Cannot close period: the following checklist items are not signed off: ${labels}`,
+        });
+      }
+    }
   }
 
   const [updated] = await db

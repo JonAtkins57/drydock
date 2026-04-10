@@ -457,11 +457,11 @@ export async function postJournal(
       return err({ code: 'NOT_FOUND', message: 'Accounting period not found' });
     }
 
-    if (periodRow.status !== 'open') {
+    if (periodRow.status !== 'open' && periodRow.status !== 'soft_close') {
       await client.query('ROLLBACK');
       return err({
         code: 'VALIDATION',
-        message: `Cannot post to period with status '${periodRow.status}'. Period must be 'open'.`,
+        message: `Cannot post to period with status '${periodRow.status}'. Period must be 'open' or 'soft_close'.`,
       });
     }
 
@@ -685,11 +685,11 @@ export async function reverseJournal(
       });
     }
 
-    if (reversalPeriod.status !== 'open') {
+    if (reversalPeriod.status !== 'open' && reversalPeriod.status !== 'soft_close') {
       await client.query('ROLLBACK');
       return err({
         code: 'VALIDATION',
-        message: `Reversal period must be open. Current status: '${reversalPeriod.status}'`,
+        message: `Reversal period must be open or soft_close. Current status: '${reversalPeriod.status}'`,
       });
     }
 

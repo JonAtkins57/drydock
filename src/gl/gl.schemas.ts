@@ -209,3 +209,52 @@ export interface BalanceSheetResult {
   totalLiabilities: number;
   totalEquity: number;
 }
+
+// ── Close Checklists ───────────────────────────────────────────────
+
+export const checklistItemTypeEnum = z.enum([
+  'sub_ledger_rec',
+  'bank_rec',
+  'ar_aging',
+  'ap_aging',
+  'fixed_asset_roll',
+  'prepaid_roll',
+  'accruals_posted',
+]);
+export type ChecklistItemType = z.infer<typeof checklistItemTypeEnum>;
+
+export const checklistItemStatusEnum = z.enum(['open', 'in_progress', 'reviewed', 'signed_off']);
+export type ChecklistItemStatus = z.infer<typeof checklistItemStatusEnum>;
+
+export const createChecklistSchema = z.object({
+  periodId: z.string().uuid(),
+});
+export type CreateChecklistInput = z.infer<typeof createChecklistSchema>;
+
+export const updateChecklistItemSchema = z.object({
+  status: checklistItemStatusEnum.optional(),
+  notes: z.string().max(2000).nullish(),
+  assigneeId: z.string().uuid().nullish(),
+  dueDate: z.string().datetime().nullish(),
+});
+export type UpdateChecklistItemInput = z.infer<typeof updateChecklistItemSchema>;
+
+export const listChecklistQuerySchema = z.object({
+  periodId: z.string().uuid(),
+});
+export type ListChecklistQuery = z.infer<typeof listChecklistQuerySchema>;
+
+export interface ChecklistSummary {
+  total: number;
+  open: number;
+  inProgress: number;
+  reviewed: number;
+  signedOff: number;
+}
+
+export interface ChecklistSummaryResult {
+  checklistId: string;
+  periodId: string;
+  items: Record<string, unknown[]>;
+  outstandingCount: number;
+}

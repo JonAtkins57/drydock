@@ -13,10 +13,14 @@ import {
   trialBalanceQuerySchema,
   incomeStatementQuerySchema,
   balanceSheetQuerySchema,
+  createChecklistSchema,
+  updateChecklistItemSchema,
+  listChecklistQuerySchema,
 } from './gl.schemas.js';
 import * as accountsSvc from './accounts.service.js';
 import * as periodsSvc from './periods.service.js';
 import * as postingSvc from './posting.service.js';
+import * as checklistSvc from './close-checklist.service.js';
 import { getTrialBalance } from './trial-balance.service.js';
 import { getIncomeStatement, getBalanceSheet } from './reporting.js';
 import type { AppErrorCode } from '../lib/result.js';
@@ -396,6 +400,97 @@ const glRoutes: FastifyPluginCallback = (fastify: FastifyInstance, _opts, done) 
 
     return reply.status(200).send(result.value);
   });
+
+  // ════════════════════════════════════════════════════════════════
+  // CLOSE CHECKLISTS
+  // ════════════════════════════════════════════════════════════════
+
+  // POST /api/v1/close-checklists
+  fastify.post('/api/v1/close-checklists', {
+    preHandler: [requirePermission('gl.period.manage')],
+  }, async (request, reply) => {
+    const parsed = createChecklistSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(400).send(errorResponse('BAD_REQUEST', 'Validation failed', {
+        errors: parsed.error.flatten().fieldErrors,
+      }));
+    }
+
+    const { tenantId, sub: userId } = request.currentUser;
+    const result = await checklistSvc.createChecklist(tenantId, parsed.data.periodId, userId);
+    if (!result.ok) {
+      const status = errorStatus(result.error.code);
+      return reply.status(status).send(errorResponse(result.error.code, result.error.message));
+    }
+
+    return reply.status(201).send(result.value);
+  });
+
+  // GET /api/v1/close-checklists?periodId=X
+  fastify.get('/api/v1/close-checklists', {
+    preHandler: [requirePermission('gl.period.read')],
+  }, async (request, reply) => {
+    const parsed = listChecklistQuerySchema.safeParse(request.query);
+    if (!parsed.success) {
+      return reply.status(400).send(errorResponse('BAD_REQUEST', 'Invalid query parameters', {
+        errors: parsed.error.flatten().fieldErrors,
+      }));
+    }
+
+    const { tenantId } = request.currentUser;
+    const result = await checklistSvc.getChecklistByPeriod(tenantId, parsed.data.periodId);
+    if (!result.ok) {
+      const status = errorStatus(result.error.code);
+      return reply.status(status).send(errorResponse(result.error.code, result.error.message));
+    }
+
+    return reply.status(200).send(result.value);
+  });
+
+  // PATCH /api/v1/close-checklists/:checklistId/items/:itemId
+  fastify.patch<{ Params: { checklistId: string; itemId: string } }>(
+    '/api/v1/close-checklists/:checklistId/items/:itemId',
+    { preHandler: [requirePermission('gl.period.manage')] },
+    async (request, reply) => {
+      const parsed = updateChecklistItemSchema.safeParse(request.body);
+      if (!parsed.success) {
+        return reply.status(400).send(errorResponse('BAD_REQUEST', 'Validation failed', {
+          errors: parsed.error.flatten().fieldErrors,
+        }));
+      }
+
+      const { tenantId, sub: userId } = request.currentUser;
+      const result = await checklistSvc.updateChecklistItem(
+        tenantId,
+        request.params.checklistId,
+        request.params.itemId,
+        parsed.data,
+        userId,
+      );
+      if (!result.ok) {
+        const status = errorStatus(result.error.code);
+        return reply.status(status).send(errorResponse(result.error.code, result.error.message));
+      }
+
+      return reply.status(200).send(result.value);
+    },
+  );
+
+  // GET /api/v1/close-checklists/:checklistId/summary
+  fastify.get<{ Params: { checklistId: string } }>(
+    '/api/v1/close-checklists/:checklistId/summary',
+    { preHandler: [requirePermission('gl.period.read')] },
+    async (request, reply) => {
+      const { tenantId } = request.currentUser;
+      const result = await checklistSvc.getChecklistSummary(tenantId, request.params.checklistId);
+      if (!result.ok) {
+        const status = errorStatus(result.error.code);
+        return reply.status(status).send(errorResponse(result.error.code, result.error.message));
+      }
+
+      return reply.status(200).send(result.value);
+    },
+  );
 
   done();
 };

@@ -74,3 +74,27 @@ export const journalEntryLines = glSchema.table('journal_entry_lines', {
   entityId: uuid('entity_id').references(() => legalEntities.id),
   customDimensions: jsonb('custom_dimensions'),
 });
+
+export const closeChecklists = glSchema.table('close_checklists', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  periodId: uuid('period_id').notNull().references(() => accountingPeriods.id),
+  createdBy: uuid('created_by').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const closeChecklistItems = glSchema.table('close_checklist_items', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  checklistId: uuid('checklist_id').notNull().references(() => closeChecklists.id),
+  itemType: text('item_type').notNull(),
+  label: text('label').notNull(),
+  assigneeId: uuid('assignee_id'),
+  dueDate: timestamp('due_date', { withTimezone: true }),
+  status: text('status').notNull().default('open'),
+  notes: text('notes'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedBy: uuid('updated_by'),
+});
