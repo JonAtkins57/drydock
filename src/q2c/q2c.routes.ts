@@ -23,6 +23,17 @@ import {
 } from './q2c.schemas.js';
 import type { AppError } from '../lib/result.js';
 
+// ── HTML escaping helper ───────────────────────────────────────────
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 // ── Error response helper ──────────────────────────────────────────
 
 const STATUS_MAP: Record<string, number> = {
@@ -159,11 +170,13 @@ async function quoteRoutes(fastify: FastifyInstance): Promise<void> {
 
     const totalDollars = '$' + (quote.totalAmount / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     const validUntilStr = quote.validUntil ? new Date(quote.validUntil).toLocaleDateString('en-US') : 'N/A';
-    const subject = `Quote ${quote.quoteNumber}: ${quote.name}`;
+    const safeQuoteNumber = escapeHtml(quote.quoteNumber ?? '');
+    const safeQuoteName = escapeHtml(quote.name ?? '');
+    const subject = `Quote ${safeQuoteNumber}: ${safeQuoteName}`;
     const html = `
       <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px;">
-        <h1 style="color: #1a3a4a; font-size: 24px;">Quote ${quote.quoteNumber}</h1>
-        <p style="color: #4a5568;"><strong>Name:</strong> ${quote.name}</p>
+        <h1 style="color: #1a3a4a; font-size: 24px;">Quote ${safeQuoteNumber}</h1>
+        <p style="color: #4a5568;"><strong>Name:</strong> ${safeQuoteName}</p>
         <p style="color: #4a5568;"><strong>Total:</strong> ${totalDollars}</p>
         <p style="color: #4a5568;"><strong>Valid Until:</strong> ${validUntilStr}</p>
         <p style="color: #718096; font-size: 13px; margin-top: 30px;">Thrasoz / DryDock Operational Platform</p>
@@ -353,10 +366,11 @@ async function invoiceRoutes(fastify: FastifyInstance): Promise<void> {
 
     const totalDollars = '$' + (invoice.totalAmount / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     const dueDateStr = new Date(invoice.dueDate).toLocaleDateString('en-US');
-    const subject = `Invoice ${invoice.invoiceNumber} — Due ${dueDateStr}`;
+    const safeInvoiceNumber = escapeHtml(invoice.invoiceNumber ?? '');
+    const subject = `Invoice ${safeInvoiceNumber} — Due ${dueDateStr}`;
     const html = `
       <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px;">
-        <h1 style="color: #1a3a4a; font-size: 24px;">Invoice ${invoice.invoiceNumber}</h1>
+        <h1 style="color: #1a3a4a; font-size: 24px;">Invoice ${safeInvoiceNumber}</h1>
         <p style="color: #4a5568;"><strong>Total:</strong> ${totalDollars}</p>
         <p style="color: #4a5568;"><strong>Due Date:</strong> ${dueDateStr}</p>
         <p style="color: #718096; font-size: 13px; margin-top: 30px;">Thrasoz / DryDock Operational Platform</p>
