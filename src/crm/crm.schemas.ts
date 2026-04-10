@@ -122,3 +122,90 @@ export const listActivitiesQuerySchema = paginationQuerySchema.extend({
 });
 
 export type ListActivitiesQuery = z.infer<typeof listActivitiesQuerySchema>;
+
+// ── Contract Schemas ───────────────────────────────────────────────
+
+export const contractStatusValues = ['draft', 'executed', 'active', 'expired', 'terminated'] as const;
+export type ContractStatus = (typeof contractStatusValues)[number];
+
+export const createContractSchema = z.object({
+  contractNumber: z.string().min(1).max(100),
+  name: z.string().min(1).max(255),
+  customerId: uuidSchema,
+  opportunityId: uuidSchema.optional(),
+  status: z.enum(contractStatusValues).default('draft'),
+  effectiveDate: z.string().datetime(),
+  expirationDate: z.string().datetime().optional(),
+  totalValue: z.number().int().nonnegative().optional(),
+  terms: z.string().max(50000).optional(),
+  autoRenew: z.boolean().default(false),
+  renewalNoticeDays: z.number().int().positive().optional(),
+  billingPlanId: uuidSchema.optional(),
+  assignedTo: uuidSchema.optional(),
+});
+
+export type CreateContractInput = z.infer<typeof createContractSchema>;
+
+export const updateContractSchema = createContractSchema.partial();
+
+export type UpdateContractInput = z.infer<typeof updateContractSchema>;
+
+export const listContractsQuerySchema = paginationQuerySchema.extend({
+  status: z.enum(contractStatusValues).optional(),
+  customerId: uuidSchema.optional(),
+  assignedTo: uuidSchema.optional(),
+});
+
+export type ListContractsQuery = z.infer<typeof listContractsQuerySchema>;
+
+export const transitionContractSchema = z.object({
+  status: z.enum(contractStatusValues),
+});
+
+export type TransitionContractInput = z.infer<typeof transitionContractSchema>;
+
+export const addContractLineSchema = z.object({
+  lineNumber: z.number().int().positive(),
+  description: z.string().min(1).max(1000),
+  quantity: z.number().int().positive(),
+  unitPrice: z.number().int().nonnegative(),
+  amount: z.number().int().nonnegative(),
+  deliveryTerms: z.string().max(500).optional(),
+  itemId: uuidSchema.optional(),
+});
+
+export type AddContractLineInput = z.infer<typeof addContractLineSchema>;
+
+// ── Subscription Schemas ───────────────────────────────────────────
+
+export const subscriptionBillingCycleValues = ['monthly', 'quarterly', 'annual', 'one_time'] as const;
+export type SubscriptionBillingCycle = (typeof subscriptionBillingCycleValues)[number];
+
+export const subscriptionStatusValues = ['active', 'paused', 'cancelled', 'expired'] as const;
+export type SubscriptionStatus = (typeof subscriptionStatusValues)[number];
+
+export const createSubscriptionSchema = z.object({
+  contractId: uuidSchema.optional(),
+  customerId: uuidSchema,
+  name: z.string().min(1).max(255),
+  plan: z.string().min(1).max(255),
+  quantity: z.number().int().positive(),
+  unitPrice: z.number().int().nonnegative(),
+  billingCycle: z.enum(subscriptionBillingCycleValues),
+  status: z.enum(subscriptionStatusValues).default('active'),
+  startDate: z.string().datetime(),
+  endDate: z.string().datetime().optional(),
+  billingPlanId: uuidSchema.optional(),
+});
+
+export type CreateSubscriptionInput = z.infer<typeof createSubscriptionSchema>;
+
+export const updateSubscriptionSchema = createSubscriptionSchema.partial();
+
+export type UpdateSubscriptionInput = z.infer<typeof updateSubscriptionSchema>;
+
+export const listSubscriptionsQuerySchema = paginationQuerySchema.extend({
+  status: z.enum(subscriptionStatusValues).optional(),
+  customerId: uuidSchema.optional(),
+  contractId: uuidSchema.optional(),
+});

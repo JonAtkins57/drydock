@@ -3,6 +3,8 @@ import { authenticateHook, setTenantContext } from '../core/auth.middleware.js';
 import { leadService } from './leads.service.js';
 import { opportunityService } from './opportunities.service.js';
 import { activityService } from './activities.service.js';
+import { contractService } from './contracts.service.js';
+import { subscriptionService } from './subscriptions.service.js';
 import {
   createLeadSchema,
   updateLeadSchema,
@@ -14,6 +16,14 @@ import {
   createActivitySchema,
   listActivitiesQuerySchema,
   paginationQuerySchema,
+  createContractSchema,
+  updateContractSchema,
+  listContractsQuerySchema,
+  transitionContractSchema,
+  addContractLineSchema,
+  createSubscriptionSchema,
+  updateSubscriptionSchema,
+  listSubscriptionsQuerySchema,
 } from './crm.schemas.js';
 import type { AppError } from '../lib/result.js';
 
@@ -272,10 +282,196 @@ export async function activityRoutes(fastify: FastifyInstance): Promise<void> {
   });
 }
 
+// ── Contract Routes ────────────────────────────────────────────────
+
+export async function contractRoutes(fastify: FastifyInstance): Promise<void> {
+  fastify.addHook('onRequest', authenticateHook);
+  fastify.addHook('preHandler', setTenantContext);
+
+  // GET / — list contracts
+  fastify.get('/', async (request: FastifyRequest, reply: FastifyReply) => {
+    const query = listContractsQuerySchema.safeParse(request.query);
+    if (!query.success) {
+      return reply.status(422).send({
+        error: 'VALIDATION',
+        message: 'Invalid query parameters',
+        details: query.error.flatten().fieldErrors,
+      });
+    }
+
+    const { tenantId } = request.currentUser;
+    const result = await contractService.listContracts(tenantId, query.data);
+    if (!result.ok) return sendError(reply, result.error);
+    return reply.send(result.value);
+  });
+
+  // GET /:id — get contract
+  fastify.get('/:id', async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    const { tenantId } = request.currentUser;
+    const { id } = request.params;
+
+    const result = await contractService.getContract(tenantId, id);
+    if (!result.ok) return sendError(reply, result.error);
+    return reply.send(result.value);
+  });
+
+  // POST / — create contract
+  fastify.post('/', async (request: FastifyRequest, reply: FastifyReply) => {
+    const parsed = createContractSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(422).send({
+        error: 'VALIDATION',
+        message: 'Invalid request body',
+        details: parsed.error.flatten().fieldErrors,
+      });
+    }
+
+    const { tenantId, sub: userId } = request.currentUser;
+    const result = await contractService.createContract(tenantId, parsed.data, userId);
+    if (!result.ok) return sendError(reply, result.error);
+    return reply.status(201).send(result.value);
+  });
+
+  // PATCH /:id — update contract
+  fastify.patch('/:id', async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    const parsed = updateContractSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(422).send({
+        error: 'VALIDATION',
+        message: 'Invalid request body',
+        details: parsed.error.flatten().fieldErrors,
+      });
+    }
+
+    const { tenantId, sub: userId } = request.currentUser;
+    const { id } = request.params;
+    const result = await contractService.updateContract(tenantId, id, parsed.data, userId);
+    if (!result.ok) return sendError(reply, result.error);
+    return reply.send(result.value);
+  });
+
+  // POST /:id/actions/transition — transition contract status
+  fastify.post('/:id/actions/transition', async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    const parsed = transitionContractSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(422).send({
+        error: 'VALIDATION',
+        message: 'Invalid request body',
+        details: parsed.error.flatten().fieldErrors,
+      });
+    }
+
+    const { tenantId, sub: userId } = request.currentUser;
+    const { id } = request.params;
+    const result = await contractService.transitionContractStatus(tenantId, id, parsed.data.status, userId);
+    if (!result.ok) return sendError(reply, result.error);
+    return reply.send(result.value);
+  });
+
+  // GET /:id/lines — list contract lines
+  fastify.get('/:id/lines', async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    const { tenantId } = request.currentUser;
+    const { id } = request.params;
+
+    const result = await contractService.listContractLines(tenantId, id);
+    if (!result.ok) return sendError(reply, result.error);
+    return reply.send({ data: result.value });
+  });
+
+  // POST /:id/lines — add contract line
+  fastify.post('/:id/lines', async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    const parsed = addContractLineSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(422).send({
+        error: 'VALIDATION',
+        message: 'Invalid request body',
+        details: parsed.error.flatten().fieldErrors,
+      });
+    }
+
+    const { tenantId, sub: userId } = request.currentUser;
+    const { id } = request.params;
+    const result = await contractService.addContractLine(tenantId, id, parsed.data, userId);
+    if (!result.ok) return sendError(reply, result.error);
+    return reply.status(201).send(result.value);
+  });
+}
+
+// ── Subscription Routes ────────────────────────────────────────────
+
+export async function subscriptionRoutes(fastify: FastifyInstance): Promise<void> {
+  fastify.addHook('onRequest', authenticateHook);
+  fastify.addHook('preHandler', setTenantContext);
+
+  // GET / — list subscriptions
+  fastify.get('/', async (request: FastifyRequest, reply: FastifyReply) => {
+    const query = listSubscriptionsQuerySchema.safeParse(request.query);
+    if (!query.success) {
+      return reply.status(422).send({
+        error: 'VALIDATION',
+        message: 'Invalid query parameters',
+        details: query.error.flatten().fieldErrors,
+      });
+    }
+
+    const { tenantId } = request.currentUser;
+    const result = await subscriptionService.listSubscriptions(tenantId, query.data);
+    if (!result.ok) return sendError(reply, result.error);
+    return reply.send(result.value);
+  });
+
+  // GET /:id — get subscription
+  fastify.get('/:id', async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    const { tenantId } = request.currentUser;
+    const { id } = request.params;
+
+    const result = await subscriptionService.getSubscription(tenantId, id);
+    if (!result.ok) return sendError(reply, result.error);
+    return reply.send(result.value);
+  });
+
+  // POST / — create subscription
+  fastify.post('/', async (request: FastifyRequest, reply: FastifyReply) => {
+    const parsed = createSubscriptionSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(422).send({
+        error: 'VALIDATION',
+        message: 'Invalid request body',
+        details: parsed.error.flatten().fieldErrors,
+      });
+    }
+
+    const { tenantId, sub: userId } = request.currentUser;
+    const result = await subscriptionService.createSubscription(tenantId, parsed.data, userId);
+    if (!result.ok) return sendError(reply, result.error);
+    return reply.status(201).send(result.value);
+  });
+
+  // PATCH /:id — update subscription
+  fastify.patch('/:id', async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    const parsed = updateSubscriptionSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(422).send({
+        error: 'VALIDATION',
+        message: 'Invalid request body',
+        details: parsed.error.flatten().fieldErrors,
+      });
+    }
+
+    const { tenantId, sub: userId } = request.currentUser;
+    const { id } = request.params;
+    const result = await subscriptionService.updateSubscription(tenantId, id, parsed.data, userId);
+    if (!result.ok) return sendError(reply, result.error);
+    return reply.send(result.value);
+  });
+}
+
 // ── Combined CRM Plugin ────────────────────────────────────────────
 
 export async function crmRoutes(fastify: FastifyInstance): Promise<void> {
   await fastify.register(leadRoutes, { prefix: '/api/v1/leads' });
   await fastify.register(opportunityRoutes, { prefix: '/api/v1/opportunities' });
   await fastify.register(activityRoutes, { prefix: '/api/v1/activities' });
+  await fastify.register(contractRoutes, { prefix: '/api/v1/contracts' });
+  await fastify.register(subscriptionRoutes, { prefix: '/api/v1/subscriptions' });
 }
