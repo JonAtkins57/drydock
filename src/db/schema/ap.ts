@@ -1,4 +1,4 @@
-import { pgSchema, uuid, text, boolean, jsonb, integer, timestamp, numeric } from 'drizzle-orm/pg-core';
+import { pgSchema, uuid, text, boolean, jsonb, integer, bigint, date, timestamp, numeric } from 'drizzle-orm/pg-core';
 import { vendors, projects, costCenters, departments } from './master.js';
 import { accounts } from './gl.js';
 
@@ -85,6 +85,44 @@ export const codingRules = apSchema.table('coding_rules', {
   priority: integer('priority').notNull().default(0),
   isActive: boolean('is_active').notNull().default(true),
   matchCount: integer('match_count').notNull().default(0),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// ── Amortization Schedules ───────────────────────────────────────────
+
+export const amortizationSchedules = apSchema.table('amortization_schedules', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  apInvoiceId: uuid('ap_invoice_id').references(() => apInvoices.id),
+  description: text('description'),
+  totalAmount: bigint('total_amount', { mode: 'number' }).notNull(),
+  expenseAccountId: uuid('expense_account_id').notNull().references(() => accounts.id),
+  prepaidAccountId: uuid('prepaid_account_id').notNull().references(() => accounts.id),
+  startDate: date('start_date').notNull(),
+  endDate: date('end_date').notNull(),
+  frequency: text('frequency').notNull().default('monthly'),
+  status: text('status').notNull().default('active'),
+  departmentId: uuid('department_id').references(() => departments.id),
+  projectId: uuid('project_id').references(() => projects.id),
+  costCenterId: uuid('cost_center_id').references(() => costCenters.id),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  createdBy: uuid('created_by'),
+  updatedBy: uuid('updated_by'),
+});
+
+// ── Amortization Schedule Lines ──────────────────────────────────────
+
+export const amortizationScheduleLines = apSchema.table('amortization_schedule_lines', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  scheduleId: uuid('schedule_id').notNull().references(() => amortizationSchedules.id),
+  lineNumber: integer('line_number').notNull(),
+  periodDate: date('period_date').notNull(),
+  amount: bigint('amount', { mode: 'number' }).notNull(),
+  status: text('status').notNull().default('pending'),
+  journalEntryId: uuid('journal_entry_id'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
