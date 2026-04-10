@@ -5,6 +5,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
+import fastifyMultipart from '@fastify/multipart';
 import fastifyStatic from '@fastify/static';
 import fastifySwagger from '@fastify/swagger';
 import fastifySwaggerUi from '@fastify/swagger-ui';
@@ -20,6 +21,7 @@ import { q2cRoutes } from './q2c/q2c.routes.js';
 import { p2pRoutes } from './p2p/p2p.routes.js';
 import bamboohrRoutes from './integration/bamboohr.routes.js';
 import apRoutes from './ap-portal/ap.routes.js';
+import attachmentRoutes from './core/attachments.routes.js';
 import type { AppErrorCode } from './lib/result.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -38,6 +40,11 @@ async function buildServer() {
   await fastify.register(cors, {
     origin: process.env.CORS_ORIGIN ?? true,
     credentials: true,
+  });
+
+  // ── Multipart (file uploads) ──────────────────────────────────────
+  await fastify.register(fastifyMultipart, {
+    limits: { fileSize: 50 * 1024 * 1024 }, // 50 MB
   });
 
   // ── Swagger ───────────────────────────────────────────────────────
@@ -107,6 +114,7 @@ async function buildServer() {
   await fastify.register(p2pRoutes);
   await fastify.register(bamboohrRoutes);
   await fastify.register(apRoutes);
+  await fastify.register(attachmentRoutes);
 
   // ── RFC 7807 Error Handler ────────────────────────────────────────
   const errorCodeToStatus: Record<AppErrorCode, number> = {

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/store';
 import { endpoints } from '../lib/api';
 import Sidebar from '../components/Sidebar';
+import AttachmentsList from '../components/AttachmentsList';
 
 interface Invoice {
   id: string;
@@ -56,6 +57,7 @@ export default function Invoices() {
   const [showPayment, setShowPayment] = useState<Invoice | null>(null);
   const [paymentAmount, setPaymentAmount] = useState('');
   const [aging, setAging] = useState<ArAgingData | null>(null);
+  const [selectedAttachInvoice, setSelectedAttachInvoice] = useState<Invoice | null>(null);
 
   // Create form
   const [customer, setCustomer] = useState('');
@@ -369,6 +371,7 @@ export default function Invoices() {
                 <th className="text-right px-5 py-3 text-xs text-drydock-steel uppercase tracking-wider font-medium">Paid</th>
                 <th className="text-left px-5 py-3 text-xs text-drydock-steel uppercase tracking-wider font-medium">Created</th>
                 <th className="text-left px-5 py-3 text-xs text-drydock-steel uppercase tracking-wider font-medium">Actions</th>
+                <th className="text-left px-5 py-3 text-xs text-drydock-steel uppercase tracking-wider font-medium">Files</th>
               </tr>
             </thead>
             <tbody>
@@ -381,7 +384,7 @@ export default function Invoices() {
                   </tr>
                 ))
               ) : items.length === 0 ? (
-                <tr><td colSpan={8} className="px-5 py-8 text-center text-drydock-steel">No invoices found</td></tr>
+                <tr><td colSpan={9} className="px-5 py-8 text-center text-drydock-steel">No invoices found</td></tr>
               ) : (
                 items.map((inv) => {
                   const displayStatus = getDisplayStatus(inv);

@@ -229,4 +229,47 @@ export const endpoints = {
       `/billing-plans?page=${page}&pageSize=${pageSize}`
     ),
   createBillingPlan: (data: unknown) => api('/billing-plans', { method: 'POST', body: data }),
+
+  // Attachments
+  listAttachments: (entityType: string, entityId: string): Promise<AttachmentRow[]> => {
+    const token = localStorage.getItem('drydock_token');
+    return fetch(`${BASE}/attachments?entity_type=${encodeURIComponent(entityType)}&entity_id=${encodeURIComponent(entityId)}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    }).then((r) => r.json() as Promise<AttachmentRow[]>);
+  },
+
+  uploadAttachment: (entityType: string, entityId: string, file: File): Promise<AttachmentRow> => {
+    const token = localStorage.getItem('drydock_token');
+    const form = new FormData();
+    form.append('entity_type', entityType);
+    form.append('entity_id', entityId);
+    form.append('file', file);
+    return fetch(`${BASE}/attachments`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: form,
+    }).then((r) => r.json() as Promise<AttachmentRow>);
+  },
+
+  deleteAttachment: (id: string): Promise<void> => {
+    const token = localStorage.getItem('drydock_token');
+    return fetch(`${BASE}/attachments/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    }).then(() => undefined);
+  },
 };
+
+export interface AttachmentRow {
+  id: string;
+  tenantId: string;
+  entityType: string;
+  entityId: string;
+  filename: string;
+  s3Key: string;
+  mimeType: string;
+  sizeBytes: number;
+  uploadedBy: string | null;
+  createdAt: string;
+  presigned_url: string;
+}
