@@ -50,4 +50,39 @@ export const endpoints = {
   accounts: () => api<{ data: unknown[] }>('/accounts'),
   periods: () => api<unknown[]>('/accounting-periods'),
   health: () => api<{ status: string; version: string }>('/health'),
+  leads: (page = 1, pageSize = 25, status?: string) =>
+    api<{ data: unknown[]; meta: { total: number; page: number; pageSize: number; totalPages: number } }>(
+      `/leads?page=${page}&pageSize=${pageSize}${status ? `&filter={"status":"${status}"}` : ''}`
+    ),
+  createLead: (data: unknown) => api('/leads', { method: 'POST', body: data }),
+  convertLead: (id: string, data: unknown) => api(`/leads/${id}/convert`, { method: 'POST', body: data }),
+  opportunities: (page = 1, pageSize = 25) =>
+    api<{ data: unknown[]; meta: { total: number; page: number; pageSize: number; totalPages: number } }>(
+      `/opportunities?page=${page}&pageSize=${pageSize}`
+    ),
+  pipeline: () => api<unknown>('/opportunities/pipeline'),
+  createOpportunity: (data: unknown) => api('/opportunities', { method: 'POST', body: data }),
+  activities: (page = 1, pageSize = 25) =>
+    api<{ data: unknown[]; meta: { total: number; page: number; pageSize: number; totalPages: number } }>(
+      `/activities?page=${page}&pageSize=${pageSize}`
+    ),
+  myActivities: (page = 1, pageSize = 25) =>
+    api<{ data: unknown[]; meta: { total: number; page: number; pageSize: number; totalPages: number } }>(
+      `/activities/mine?page=${page}&pageSize=${pageSize}`
+    ),
+  createActivity: (data: unknown) => api('/activities', { method: 'POST', body: data }),
+  completeActivity: (id: string) => api(`/activities/${id}/complete`, { method: 'POST' }),
+  journalEntries: (page = 1, pageSize = 25) =>
+    api<{ data: unknown[]; meta: { total: number; page: number; pageSize: number; totalPages: number } }>(
+      `/journal-entries?page=${page}&pageSize=${pageSize}`
+    ),
+  createJournalEntry: (data: unknown) => api('/journal-entries', { method: 'POST', body: data }),
+  journalAction: (id: string, action: string) =>
+    api(`/journal-entries/${id}/actions/${action}`, { method: 'POST' }),
+  trialBalance: (params?: Record<string, string>) => {
+    const qs = params ? '?' + new URLSearchParams(params).toString() : '';
+    return api<unknown>(`/reports/trial-balance${qs}`);
+  },
+  createVendor: (data: unknown) => api('/vendors', { method: 'POST', body: data }),
+  createAccount: (data: unknown) => api('/accounts', { method: 'POST', body: data }),
 };
