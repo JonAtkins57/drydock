@@ -72,19 +72,12 @@ async function buildServer() {
   // ── Static Files ──────────────────────────────────────────────────
   const projectRoot = process.cwd();
 
-  // Serve React app build
+  // Serve React app build (includes logo in assets/)
   const appDir = path.join(projectRoot, 'src', 'public', 'app');
   await fastify.register(fastifyStatic, {
     root: appDir,
     prefix: '/',
     decorateReply: true,
-  });
-
-  // Serve assets (logo, etc.)
-  await fastify.register(fastifyStatic, {
-    root: path.join(projectRoot, 'assets'),
-    prefix: '/assets/',
-    decorateReply: false,
   });
 
   // SPA fallback — serve index.html for all non-API, non-asset routes

@@ -19,5 +19,6 @@ export default defineConfig({
   build: {
     outDir: '../src/public/app',
     emptyOutDir: true,
+    copyPublicDir: true,
   },
 });
