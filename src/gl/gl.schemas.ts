@@ -167,3 +167,45 @@ export interface TrialBalanceResult {
   totalDebits: number;
   totalCredits: number;
 }
+
+// ── Income Statement ───────────────────────────────────────────────
+
+export const incomeStatementQuerySchema = z.object({
+  dateFrom: z.string().datetime().optional(),
+  dateTo: z.string().datetime().optional(),
+  entityId: z.string().uuid().optional(),
+});
+export type IncomeStatementQuery = z.infer<typeof incomeStatementQuerySchema>;
+
+export interface AccountRow {
+  accountId: string;
+  accountNumber: string;
+  accountName: string;
+  accountType: string;
+  netAmount: number;
+}
+
+export interface IncomeStatementResult {
+  revenue: AccountRow[];
+  expenses: AccountRow[];
+  totalRevenue: number;
+  totalExpenses: number;
+  netIncome: number;
+}
+
+// ── Balance Sheet ──────────────────────────────────────────────────
+
+export const balanceSheetQuerySchema = z.object({
+  asOf: z.string().datetime().optional(),
+  entityId: z.string().uuid().optional(),
+});
+export type BalanceSheetQuery = z.infer<typeof balanceSheetQuerySchema>;
+
+export interface BalanceSheetResult {
+  assets: AccountRow[];
+  liabilities: AccountRow[];
+  equity: AccountRow[];
+  totalAssets: number;
+  totalLiabilities: number;
+  totalEquity: number;
+}

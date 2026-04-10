@@ -119,6 +119,14 @@ export const endpoints = {
     const qs = params ? '?' + new URLSearchParams(params).toString() : '';
     return api<unknown>(`/reports/trial-balance${qs}`);
   },
+  incomeStatement: (params?: Record<string, string>) => {
+    const qs = params ? '?' + new URLSearchParams(params).toString() : '';
+    return api<unknown>(`/reports/income-statement${qs}`);
+  },
+  balanceSheet: (params?: Record<string, string>) => {
+    const qs = params ? '?' + new URLSearchParams(params).toString() : '';
+    return api<unknown>(`/reports/balance-sheet${qs}`);
+  },
   createVendor: (data: unknown) => api('/vendors', { method: 'POST', body: data }),
   createAccount: (data: unknown) => api('/accounts', { method: 'POST', body: data }),
   employees: (page = 1, pageSize = 25) =>

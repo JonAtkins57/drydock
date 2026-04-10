@@ -64,6 +64,13 @@ const SECTIONS: NavSection[] = [
     ],
   },
   {
+    label: 'Reports',
+    items: [
+      { label: 'Income Statement', path: '/reports/income-statement' },
+      { label: 'Balance Sheet', path: '/reports/balance-sheet' },
+    ],
+  },
+  {
     label: 'Settings',
     items: [
       { label: 'Custom Fields', path: '/custom-fields' },
