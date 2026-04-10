@@ -149,4 +149,39 @@ export const endpoints = {
     api<{ data: unknown[]; meta: { total: number; page: number; pageSize: number; totalPages: number } }>(
       `/goods-receipts?page=${page}&pageSize=${pageSize}`
     ),
+
+  // Q2C: Quotes
+  quotes: (page = 1, pageSize = 25) =>
+    api<{ data: unknown[]; meta: { total: number; page: number; pageSize: number; totalPages: number } }>(
+      `/quotes?page=${page}&pageSize=${pageSize}`
+    ),
+  createQuote: (data: unknown) => api('/quotes', { method: 'POST', body: data }),
+  quoteAction: (id: string, action: string) =>
+    api(`/quotes/${id}/actions/${action}`, { method: 'POST' }),
+
+  // Q2C: Sales Orders
+  orders: (page = 1, pageSize = 25) =>
+    api<{ data: unknown[]; meta: { total: number; page: number; pageSize: number; totalPages: number } }>(
+      `/orders?page=${page}&pageSize=${pageSize}`
+    ),
+  createOrder: (data: unknown) => api('/orders', { method: 'POST', body: data }),
+  orderAction: (id: string, action: string) =>
+    api(`/orders/${id}/actions/${action}`, { method: 'POST' }),
+
+  // Q2C: Invoices
+  invoices: (page = 1, pageSize = 25) =>
+    api<{ data: unknown[]; meta: { total: number; page: number; pageSize: number; totalPages: number } }>(
+      `/invoices?page=${page}&pageSize=${pageSize}`
+    ),
+  createInvoice: (data: unknown) => api('/invoices', { method: 'POST', body: data }),
+  invoiceAction: (id: string, action: string, body?: unknown) =>
+    api(`/invoices/${id}/actions/${action}`, { method: 'POST', body }),
+  arAging: () => api<unknown>('/reports/ar-aging'),
+
+  // Q2C: Billing Plans
+  billingPlans: (page = 1, pageSize = 25) =>
+    api<{ data: unknown[]; meta: { total: number; page: number; pageSize: number; totalPages: number } }>(
+      `/billing-plans?page=${page}&pageSize=${pageSize}`
+    ),
+  createBillingPlan: (data: unknown) => api('/billing-plans', { method: 'POST', body: data }),
 };

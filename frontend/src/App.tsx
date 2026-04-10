@@ -21,6 +21,10 @@ import PurchaseOrders from './pages/PurchaseOrders';
 import ApProcessingConsole from './pages/ApProcessingConsole';
 import ApInvoiceDetail from './pages/ApInvoiceDetail';
 import GoodsReceipts from './pages/GoodsReceipts';
+import Quotes from './pages/Quotes';
+import SalesOrders from './pages/SalesOrders';
+import Invoices from './pages/Invoices';
+import BillingPlans from './pages/BillingPlans';
 
 export default function App() {
   const { init, token } = useAuth();
@@ -53,6 +57,10 @@ export default function App() {
       <Route path="/ap-console" element={<ApProcessingConsole />} />
       <Route path="/ap-invoices/:id" element={<ApInvoiceDetail />} />
       <Route path="/goods-receipts" element={<GoodsReceipts />} />
+      <Route path="/quotes" element={<Quotes />} />
+      <Route path="/orders" element={<SalesOrders />} />
+      <Route path="/invoices" element={<Invoices />} />
+      <Route path="/billing-plans" element={<BillingPlans />} />
       <Route path="/" element={token ? <Navigate to="/dashboard" /> : <Landing />} />
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>

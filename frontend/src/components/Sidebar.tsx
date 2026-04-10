@@ -20,6 +20,15 @@ const SECTIONS: NavSection[] = [
     ],
   },
   {
+    label: 'Q2C',
+    items: [
+      { label: 'Quotes', path: '/quotes' },
+      { label: 'Sales Orders', path: '/orders' },
+      { label: 'Invoices', path: '/invoices' },
+      { label: 'Billing Plans', path: '/billing-plans' },
+    ],
+  },
+  {
     label: 'Master Data',
     items: [
       { label: 'Customers', path: '/customers' },
