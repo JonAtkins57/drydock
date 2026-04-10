@@ -38,10 +38,11 @@ const STATUS_COLORS: Record<string, string> = {
   dispatched: 'bg-blue-900/30 text-blue-400 border-blue-700/30',
   received: 'bg-teal-900/30 text-teal-400 border-teal-700/30',
   cancelled: 'bg-gray-800 text-gray-400 border-gray-700',
+  sent: 'bg-indigo-900/30 text-indigo-400 border-indigo-700/30',
 };
 
 const STATUS_ACTIONS: Record<string, { label: string; action: string }[]> = {
-  draft: [{ label: 'Submit', action: 'submit' }],
+  draft: [{ label: 'Submit', action: 'submit' }, { label: 'Send to Vendor', action: 'send-to-vendor' }],
   pending_approval: [{ label: 'Approve', action: 'approve' }],
   approved: [{ label: 'Dispatch', action: 'dispatch' }],
   dispatched: [{ label: 'Receive', action: 'receive' }],

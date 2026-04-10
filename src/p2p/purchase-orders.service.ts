@@ -5,9 +5,14 @@ import {
   poLines,
   goodsReceipts,
   receiptLines,
+  emailLog,
+  vendors,
+  contacts,
 } from '../db/schema/index.js';
 import { logAction } from '../core/audit.service.js';
 import { generateNumber } from '../core/numbering.service.js';
+import { sendEmail } from '../core/email.service.js';
+import { renderPOEmailHtml } from './po-email-template.js';
 import { ok, err, type Result, type AppError } from '../lib/result.js';
 import type {
   CreatePOInput,
@@ -406,6 +411,121 @@ export async function getGoodsReceipt(
   return ok({ ...row, lines });
 }
 
+// ── Send PO to Vendor ──────────────────────────────────────────────
+
+export async function sendPOToVendor(
+  tenantId: string,
+  id: string,
+  userId: string,
+): Promise<Result<{ messageId: string; poId: string; sentTo: string }, AppError>> {
+  const existing = await getPO(tenantId, id);
+  if (!existing.ok) return existing;
+
+  if (existing.value.status !== 'draft') {
+    return err({
+      code: 'CONFLICT',
+      message: `PO must be 'draft' to send to vendor. Current: '${existing.value.status}'`,
+    });
+  }
+
+  const po = existing.value;
+
+  // Resolve vendor
+  const vendorRows = await db
+    .select()
+    .from(vendors)
+    .where(and(eq(vendors.id, po.vendorId), eq(vendors.tenantId, tenantId)))
+    .limit(1);
+
+  const vendor = vendorRows[0];
+  if (!vendor) {
+    return err({ code: 'NOT_FOUND', message: `Vendor '${po.vendorId}' not found` });
+  }
+
+  // Resolve primary contact
+  const contactRows = await db
+    .select()
+    .from(contacts)
+    .where(
+      and(
+        eq(contacts.vendorId, po.vendorId),
+        eq(contacts.tenantId, tenantId),
+        eq(contacts.isPrimary, true),
+        eq(contacts.isActive, true),
+      ),
+    )
+    .limit(1);
+
+  const contact = contactRows[0];
+  if (!contact) {
+    return err({
+      code: 'VALIDATION',
+      message: `Vendor '${vendor.name}' has no primary contact`,
+    });
+  }
+
+  if (!contact.email) {
+    return err({
+      code: 'VALIDATION',
+      message: `Primary contact for vendor '${vendor.name}' has no email address`,
+    });
+  }
+
+  const recipientEmail = contact.email;
+
+  // Render email
+  const html = renderPOEmailHtml({
+    poNumber: po.poNumber,
+    vendorName: vendor.name,
+    orderDate: po.orderDate.toISOString().substring(0, 10),
+    expectedDelivery: po.expectedDelivery
+      ? po.expectedDelivery.toISOString().substring(0, 10)
+      : null,
+    lines: po.lines.map((l) => ({
+      description: l.description,
+      quantity: l.quantity,
+      unitPrice: l.unitPrice,
+    })),
+    totalAmount: po.totalAmount,
+  });
+
+  // Send email first. If it fails, the PO stays 'draft' and the caller can retry.
+  // Committing 'sent' before a successful send would leave the PO stuck — the
+  // draft→sent guard (line 424) has no retry path for a failed delivery.
+  const emailResult = await sendEmail({
+    to: recipientEmail,
+    subject: `Purchase Order ${po.poNumber} from DryDock`,
+    html,
+  });
+
+  if (!emailResult.ok) return emailResult;
+
+  const { messageId } = emailResult.value;
+
+  // Email confirmed sent — now commit DB atomically with the known messageId.
+  await db.transaction(async (tx) => {
+    await tx
+      .insert(emailLog)
+      .values({ tenantId, poId: id, recipientEmail, sesMessageId: messageId, sentBy: userId });
+
+    await tx
+      .update(purchaseOrders)
+      .set({ status: 'sent', updatedBy: userId, updatedAt: new Date() })
+      .where(and(eq(purchaseOrders.id, id), eq(purchaseOrders.tenantId, tenantId)));
+  });
+
+  await logAction({
+    tenantId,
+    userId,
+    action: 'send_to_vendor',
+    entityType: 'purchase_order',
+    entityId: id,
+    changes: { recipientEmail, messageId, from: 'draft', to: 'sent' },
+  });
+
+  return ok({ messageId, poId: id, sentTo: recipientEmail });
+}
+
 export const purchaseOrderService = {
   createPO,
   getPO,
@@ -415,4 +535,5 @@ export const purchaseOrderService = {
   receivePO,
   listGoodsReceipts,
   getGoodsReceipt,
+  sendPOToVendor,
 };

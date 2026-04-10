@@ -211,6 +211,16 @@ export async function purchaseOrderRoutes(fastify: FastifyInstance): Promise<voi
     if (!result.ok) return sendError(reply, result.error);
     return reply.status(201).send(result.value);
   });
+
+  // POST /:id/actions/send-to-vendor — email PO to vendor and transition status draft → sent
+  fastify.post('/:id/actions/send-to-vendor', async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    const { tenantId, sub: userId } = request.currentUser;
+    const { id } = request.params;
+
+    const result = await purchaseOrderService.sendPOToVendor(tenantId, id, userId);
+    if (!result.ok) return sendError(reply, result.error);
+    return reply.send(result.value);
+  });
 }
 
 // ── Goods Receipt Routes ───────────────────────────────────────────

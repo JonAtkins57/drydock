@@ -9,7 +9,7 @@ export const requisitionStatusEnum = p2pSchema.enum('requisition_status', [
 ]);
 
 export const poStatusEnum = p2pSchema.enum('po_status', [
-  'draft', 'pending_approval', 'approved', 'dispatched', 'received', 'cancelled',
+  'draft', 'pending_approval', 'approved', 'dispatched', 'received', 'cancelled', 'sent',
 ]);
 
 // ── Purchase Requisitions ─────────────────────────────────────────
@@ -112,4 +112,16 @@ export const receiptLines = p2pSchema.table('receipt_lines', {
   notes: text('notes'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// ── Email Log ─────────────────────────────────────────────────
+
+export const emailLog = p2pSchema.table('email_log', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  poId: uuid('po_id').notNull().references(() => purchaseOrders.id),
+  recipientEmail: text('recipient_email').notNull(),
+  sesMessageId: text('ses_message_id'),
+  sentAt: timestamp('sent_at', { withTimezone: true }).notNull().defaultNow(),
+  sentBy: uuid('sent_by'),
 });
