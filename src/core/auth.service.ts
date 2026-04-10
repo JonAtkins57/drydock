@@ -249,8 +249,14 @@ export async function checkPermission(
     return permissionsResult;
   }
 
-  const has = permissionsResult.value.includes(permission) ||
-    permissionsResult.value.includes('*');
+  const perms = permissionsResult.value;
+  const has = perms.includes(permission) ||
+    perms.includes('*') ||
+    perms.some(p => {
+      if (!p.endsWith('.*')) return false;
+      const prefix = p.slice(0, -1); // 'gl.*' → 'gl.'
+      return permission.startsWith(prefix);
+    });
 
   return ok(has);
 }
