@@ -533,8 +533,8 @@ const glRoutes: FastifyPluginCallback = (fastify: FastifyInstance, _opts, done) 
       }));
     }
 
-    const { tenantId, sub: userId } = request.currentUser;
-    const result = await recurringSvc.addTemplateLine(tenantId, request.params.id, parsed.data, userId);
+    const { tenantId } = request.currentUser;
+    const result = await recurringSvc.addTemplateLine(tenantId, request.params.id, parsed.data);
     if (!result.ok) {
       const status = errorStatus(result.error.code);
       return reply.status(status).send(errorResponse(result.error.code, result.error.message));
@@ -584,8 +584,8 @@ const glRoutes: FastifyPluginCallback = (fastify: FastifyInstance, _opts, done) 
       }));
     }
 
-    const { tenantId, sub: userId } = request.currentUser;
-    const result = await recurringSvc.updateTemplate(tenantId, request.params.id, parsed.data, userId);
+    const { tenantId } = request.currentUser;
+    const result = await recurringSvc.updateTemplate(tenantId, request.params.id, parsed.data);
     if (!result.ok) {
       const status = errorStatus(result.error.code);
       return reply.status(status).send(errorResponse(result.error.code, result.error.message));
@@ -601,12 +601,11 @@ const glRoutes: FastifyPluginCallback = (fastify: FastifyInstance, _opts, done) 
       preHandler: [requirePermission('gl.recurring.update')],
     },
     async (request, reply) => {
-      const { tenantId, sub: userId } = request.currentUser;
+      const { tenantId } = request.currentUser;
       const result = await recurringSvc.deleteTemplateLine(
         tenantId,
         request.params.id,
         request.params.lineId,
-        userId,
       );
       if (!result.ok) {
         const status = errorStatus(result.error.code);

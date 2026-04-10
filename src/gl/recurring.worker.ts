@@ -1,3 +1,4 @@
+import { Queue, Worker, type Job } from 'bullmq';
 import { pool } from '../db/connection.js';
 import { createJournalEntry } from './posting.service.js';
 import { autoPostJournal, reverseJournal } from './posting.service.js';
@@ -8,17 +9,14 @@ import { logAction } from '../core/audit.service.js';
 
 export const QUEUE_RECURRING_JOURNALS = 'recurring-journals';
 
-// ── BullMQ Setup ────────────────────────────────────────────────────
+// ── Safe BIGINT Conversion ─────────────────────────────────────────
 
-let Queue: unknown;
-let Worker: unknown;
-
-try {
-  const bullmq = await import('bullmq');
-  Queue = bullmq.Queue;
-  Worker = bullmq.Worker;
-} catch {
-  console.warn('[recurring-worker] BullMQ not available — queue functionality disabled. Install bullmq and ensure Redis is running.');
+function safeParseAmount(value: string): number {
+  const big = BigInt(value);
+  if (big > BigInt(Number.MAX_SAFE_INTEGER) || big < BigInt(Number.MIN_SAFE_INTEGER)) {
+    throw new Error(`Amount ${value} exceeds safe integer range`);
+  }
+  return Number(big);
 }
 
 // ── Date Arithmetic ────────────────────────────────────────────────
@@ -186,8 +184,8 @@ async function processSingleTemplate(
 
     const lines = lineRows.map((l) => ({
       accountId: l.account_id,
-      debitAmount: parseInt(l.debit_amount, 10),
-      creditAmount: parseInt(l.credit_amount, 10),
+      debitAmount: safeParseAmount(l.debit_amount),
+      creditAmount: safeParseAmount(l.credit_amount),
       description: l.description ?? null,
       departmentId: l.department_id ?? null,
       locationId: l.location_id ?? null,
@@ -338,27 +336,16 @@ export async function setupRecurringWorker(redisUrl: string): Promise<WorkerHand
     console.warn('[recurring-worker] SYSTEM_USER_ID not set — auto-post will be skipped for all templates');
   }
 
-  if (!Queue || !Worker) {
-    console.warn('[recurring-worker] BullMQ not available — recurring journal worker not started');
-    return { async close() { /* no-op */ } };
-  }
-
-  const QueueCtor = Queue as new (name: string, opts: Record<string, unknown>) => InstanceType<any>;
-  const WorkerCtor = Worker as new (name: string, processor: (job: any) => Promise<void>, opts: Record<string, unknown>) => InstanceType<any>;
-
   const connection = { url: redisUrl };
 
-  const recurringQueue = new QueueCtor(QUEUE_RECURRING_JOURNALS, { connection });
+  const recurringQueue = new Queue(QUEUE_RECURRING_JOURNALS, { connection });
 
-  await recurringQueue.upsertJobScheduler(
-    'recurring-journals-scheduler',
-    { every: 60000 },
-    { name: 'scheduled-tick' },
-  );
+  // Register a repeating job that fires every 60 seconds to pick up due templates
+  await recurringQueue.add('scheduled-tick', {}, { repeat: { every: 60_000 } });
 
-  const recurringWorker = new WorkerCtor(
+  const recurringWorker = new Worker(
     QUEUE_RECURRING_JOURNALS,
-    async (_job: unknown) => {
+    async (_job: Job) => {
       await processRecurringJournals(systemUserId);
     },
     { connection, concurrency: 1 },

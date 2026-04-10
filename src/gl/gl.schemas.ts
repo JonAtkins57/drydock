@@ -96,8 +96,8 @@ export type UpdatePeriodStatusInput = z.infer<typeof updatePeriodStatusSchema>;
 
 export const journalEntryLineSchema = z.object({
   accountId: z.string().uuid(),
-  debitAmount: z.number().int().min(0).default(0),
-  creditAmount: z.number().int().min(0).default(0),
+  debitAmount: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER).default(0),
+  creditAmount: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER).default(0),
   description: z.string().max(500).nullish(),
   departmentId: z.string().uuid().nullish(),
   locationId: z.string().uuid().nullish(),
@@ -287,8 +287,8 @@ export type CreateRecurringTemplateInput = z.infer<typeof createRecurringTemplat
 
 export const createRecurringTemplateLineSchema = z.object({
   accountId: z.string().uuid(),
-  debitAmount: z.number().int().min(0).default(0),
-  creditAmount: z.number().int().min(0).default(0),
+  debitAmount: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER).default(0),
+  creditAmount: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER).default(0),
   description: z.string().max(500).nullish(),
   departmentId: z.string().uuid().nullish(),
   locationId: z.string().uuid().nullish(),
