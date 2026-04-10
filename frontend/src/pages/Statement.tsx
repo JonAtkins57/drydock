@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/store';
 import { endpoints, type StatementResponse, ApiError } from '../lib/api';
@@ -47,12 +47,7 @@ export default function Statement() {
     if (!user) { navigate('/login'); return; }
   }, [user, navigate]);
 
-  useEffect(() => {
-    if (!id || !from || !to || from > to) return;
-    loadStatement();
-  }, [id, from, to]);
-
-  const loadStatement = async () => {
+  const loadStatement = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -62,7 +57,12 @@ export default function Statement() {
       setError(e instanceof ApiError ? e.message : 'Failed to load statement');
     }
     setLoading(false);
-  };
+  }, [id, from, to]);
+
+  useEffect(() => {
+    if (!id || !from || !to || from > to) return;
+    loadStatement();
+  }, [loadStatement]);
 
   const handleSend = async () => {
     if (!id) return;

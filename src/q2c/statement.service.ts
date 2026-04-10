@@ -114,7 +114,10 @@ export async function getStatement(
   const fromDate = new Date(from + 'T00:00:00Z');
   const toDate = new Date(to + 'T00:00:00Z');
 
-  // Fetch limit 501 to detect truncation
+  // Filter by invoiceDate (issue date) so invoices issued in the period are shown.
+  // dueDate is used only for aging bucket computation, not for range filtering —
+  // this ensures old unpaid invoices with due dates before `from` are included
+  // as long as they were issued within the requested period.
   const rows = await db
     .select()
     .from(invoices)
@@ -123,8 +126,8 @@ export async function getStatement(
         eq(invoices.tenantId, tenantId),
         eq(invoices.customerId, customerId),
         sql`${invoices.status} IN ('sent', 'overdue')`,
-        gte(invoices.dueDate, fromDate),
-        lte(invoices.dueDate, toDate),
+        gte(invoices.invoiceDate, fromDate),
+        lte(invoices.invoiceDate, toDate),
       ),
     )
     .limit(501);
