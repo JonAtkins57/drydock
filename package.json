@@ -14,7 +14,8 @@
     "db:studio": "drizzle-kit studio",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "db:seed": "tsx db/seeds/seed.ts"
   },
   "dependencies": {
     "@aws-sdk/client-ses": "^3.1028.0",
