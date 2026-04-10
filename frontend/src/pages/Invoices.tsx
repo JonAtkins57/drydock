@@ -39,8 +39,8 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 const STATUS_ACTIONS: Record<string, { label: string; action: string }[]> = {
-  draft: [{ label: 'Send', action: 'send' }],
-  sent: [{ label: 'Record Payment', action: 'pay' }],
+  draft: [{ label: 'Send', action: 'send' }, { label: 'Email', action: 'send-email' }],
+  sent: [{ label: 'Record Payment', action: 'pay' }, { label: 'Email', action: 'send-email' }],
 };
 
 const fmtDollars = (cents: number) =>
