@@ -348,8 +348,7 @@ describe('Quote Service', () => {
 
       mocks.mockReturning
         .mockResolvedValueOnce([acceptedQuote])  // update quote
-        .mockResolvedValueOnce([mockOrder])       // insert order
-        .mockResolvedValueOnce([]);               // insert order lines
+        .mockResolvedValueOnce([mockOrder]);      // insert order
 
       const result = await quoteService.acceptQuote(TENANT_ID, QUOTE_ID, USER_ID);
 
