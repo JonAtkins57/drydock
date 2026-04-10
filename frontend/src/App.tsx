@@ -25,6 +25,7 @@ import Quotes from './pages/Quotes';
 import SalesOrders from './pages/SalesOrders';
 import Invoices from './pages/Invoices';
 import BillingPlans from './pages/BillingPlans';
+import Statement from './pages/Statement';
 
 export default function App() {
   const { init, token } = useAuth();
@@ -61,6 +62,7 @@ export default function App() {
       <Route path="/orders" element={<SalesOrders />} />
       <Route path="/invoices" element={<Invoices />} />
       <Route path="/billing-plans" element={<BillingPlans />} />
+      <Route path="/customers/:id/statement" element={<Statement />} />
       <Route path="/" element={token ? <Navigate to="/dashboard" /> : <Landing />} />
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>

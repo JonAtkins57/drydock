@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { authenticateHook } from '../core/auth.middleware.js';
 import { customerService } from './master.service.js';
@@ -7,6 +8,7 @@ import {
   paginationQuerySchema,
 } from './master.schemas.js';
 import type { AppError } from '../lib/result.js';
+import { statementService } from '../q2c/statement.service.js';
 
 // ── Error response helper ───────────────────────────────────────────
 
@@ -121,6 +123,58 @@ export async function customerRoutes(fastify: FastifyInstance): Promise<void> {
     const result = await customerService.listContacts(tenantId, id);
     if (!result.ok) return sendError(reply, result.error);
     return reply.send({ data: result.value });
+  });
+
+  // GET /:id/statement — customer statement for a date range
+  const statementQuerySchema = z.object({
+    from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  });
+
+  fastify.get('/:id/statement', async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    const { tenantId } = request.currentUser;
+    const { id } = request.params;
+
+    const parsed = statementQuerySchema.safeParse(request.query);
+    if (!parsed.success) {
+      return reply.status(422).send({
+        error: 'VALIDATION',
+        message: 'Invalid query parameters: from and to are required (YYYY-MM-DD)',
+        details: parsed.error.flatten().fieldErrors,
+      });
+    }
+
+    const { from, to } = parsed.data;
+    if (from > to) {
+      return reply.status(422).send({
+        error: 'VALIDATION',
+        message: 'from must be <= to',
+      });
+    }
+
+    const result = await statementService.getStatement(tenantId, id, from, to);
+    if (!result.ok) return sendError(reply, result.error);
+    return reply.send(result.value);
+  });
+
+  // POST /:id/actions/send-statement — email statement to customer
+  fastify.post('/:id/actions/send-statement', async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    const { tenantId } = request.currentUser;
+    const { id } = request.params;
+
+    const bodySchema = z.object({ toEmail: z.string().email().optional() });
+    const parsed = bodySchema.safeParse(request.body ?? {});
+    if (!parsed.success) {
+      return reply.status(422).send({
+        error: 'VALIDATION',
+        message: 'Invalid request body',
+        details: parsed.error.flatten().fieldErrors,
+      });
+    }
+
+    const result = await statementService.sendStatement(tenantId, id, parsed.data.toEmail);
+    if (!result.ok) return sendError(reply, result.error);
+    return reply.send(result.value);
   });
 
   // GET /:id/duplicate-check — check for duplicate customers (also available as query)
