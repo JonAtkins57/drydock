@@ -31,7 +31,7 @@ export type RequisitionStatus = (typeof requisitionStatusValues)[number];
 // ── PO Status ───────────────────────────────────────────────────────
 
 export const poStatusValues = [
-  'draft', 'pending_approval', 'approved', 'dispatched', 'received', 'cancelled',
+  'draft', 'pending_approval', 'approved', 'dispatched', 'received', 'cancelled', 'sent',
 ] as const;
 export type POStatus = (typeof poStatusValues)[number];
 
