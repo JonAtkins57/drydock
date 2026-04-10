@@ -77,17 +77,23 @@ export default function Landing() {
         <h2 className="text-center text-2xl font-light text-drydock-light tracking-wide mb-12">Product Family</h2>
         <div className="max-w-3xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-4">
           {[
-            { n: 'Shipyard', d: 'NL-to-code SDLC' },
-            { n: 'Signals', d: 'Operational intelligence' },
-            { n: 'Maestro', d: 'Agentic AI' },
+            { n: 'Shipyard', d: 'NL-to-code SDLC', href: 'https://shipyardopsai.com/' },
+            { n: 'Signals', d: 'Operational intelligence', href: 'https://signals.shipyardopsai.com/' },
+            { n: 'Maestro', d: 'Agentic AI', href: 'https://maestro.shipyardopsai.com/' },
             { n: 'DryDock', d: 'CRM + ERP + AP', active: true },
           ].map((p) => (
-            <div key={p.n} className={`text-center p-6 border rounded-lg transition-colors ${
-              p.active ? 'border-drydock-accent bg-drydock-accent/5' : 'border-drydock-border'
-            }`}>
+            <a
+              key={p.n}
+              href={(p as { href?: string }).href ?? '#'}
+              target={(p as { active?: boolean }).active ? undefined : '_blank'}
+              rel="noopener noreferrer"
+              className={`text-center p-6 border rounded-lg transition-colors block ${
+                (p as { active?: boolean }).active ? 'border-drydock-accent bg-drydock-accent/5' : 'border-drydock-border hover:border-drydock-steel'
+              }`}
+            >
               <h4 className="font-medium mb-1">{p.n}</h4>
               <p className="text-drydock-text-dim text-xs">{p.d}</p>
-            </div>
+            </a>
           ))}
         </div>
       </section>
