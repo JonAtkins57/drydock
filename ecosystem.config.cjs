@@ -1,9 +1,11 @@
 module.exports = {
   apps: [{
     name: 'drydock',
-    script: 'npx',
-    args: 'tsx src/server.ts',
+    script: './node_modules/.bin/tsx',
+    args: 'src/server.ts',
     cwd: '/home/jonat/dev/JonAtkins57/drydock',
+    interpreter: 'none',
+    exec_mode: 'fork',
     env: {
       NODE_ENV: 'development',
       PORT: 4400,
