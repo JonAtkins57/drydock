@@ -20,3 +20,4 @@ export * from './cash-forecast';
 export * from './usage-billing';
 export * from './pricing';
 export * from './reports';
+export * from './concur';

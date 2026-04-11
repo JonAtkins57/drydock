@@ -412,6 +412,27 @@ export const endpoints = {
   occCreateRateCard: (data: unknown) => api('/integrations/occ/rate-cards', { method: 'POST', body: data }),
   occUpdateRateCard: (id: string, data: unknown) => api(`/integrations/occ/rate-cards/${id}`, { method: 'PATCH', body: data }),
   occDeleteRateCard: (id: string) => api(`/integrations/occ/rate-cards/${id}`, { method: 'DELETE' }),
+  // SAP Concur Expense Integration
+  concurConnect: (data: { clientId: string; clientSecret: string; baseUrl: string; configName: string; clearingAccountId: string }) =>
+    api<{ ok: boolean; configId: string }>('/integrations/concur/connect', { method: 'POST', body: data }),
+  concurTest: (configId: string) =>
+    api<{ ok: boolean; company?: string; error?: string }>(`/integrations/concur/test/${encodeURIComponent(configId)}`),
+  concurSync: (configId: string) =>
+    api<{ syncLogId: string; recordsProcessed: number; recordsFailed: number; errors: string[] }>(
+      `/integrations/concur/sync/${encodeURIComponent(configId)}`, { method: 'POST' }
+    ),
+  concurExpenseMappings: (configId: string) =>
+    api<{ data: unknown[] }>(`/integrations/concur/expense-mappings/${encodeURIComponent(configId)}`),
+  concurSetExpenseMappings: (configId: string, mappings: Array<{ expenseTypeCode: string; expenseTypeName?: string; debitAccountId: string; creditAccountId?: string }>) =>
+    api(`/integrations/concur/expense-mappings/${encodeURIComponent(configId)}`, { method: 'PUT', body: mappings }),
+  concurDeleteExpenseMapping: (configId: string, mappingId: string) =>
+    api(`/integrations/concur/expense-mappings/${encodeURIComponent(configId)}/${encodeURIComponent(mappingId)}`, { method: 'DELETE' }),
+  concurSyncLogs: (configId: string, page = 1, pageSize = 25) =>
+    api<{ data: unknown[]; total: number }>(
+      `/integrations/concur/sync-logs/${encodeURIComponent(configId)}?page=${page}&page_size=${pageSize}`
+    ),
+  concurDisconnect: (configId: string) =>
+    api(`/integrations/concur/disconnect/${encodeURIComponent(configId)}`, { method: 'DELETE' }),
   // Pricing / Rate Cards
   rateCards: (page = 1, pageSize = 25) =>
     api<{ data: unknown[]; meta: { total: number; page: number; pageSize: number; totalPages: number } }>(`/pricing/rate-cards?page=${page}&pageSize=${pageSize}`),

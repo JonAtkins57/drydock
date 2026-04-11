@@ -44,6 +44,7 @@ import OccBilling from './pages/OccBilling';
 import { Warehouses, InventoryItemsPage, InventoryTransactionsPage } from './pages/Inventory';
 import PricingRateCards from './pages/PricingRateCards';
 import JiraIntegration from './pages/JiraIntegration';
+import ConcurIntegration from './pages/ConcurIntegration';
 
 export default function App() {
   const { init, token } = useAuth();
@@ -101,6 +102,7 @@ export default function App() {
       <Route path="/inventory-transactions" element={<InventoryTransactionsPage />} />
       <Route path="/pricing/rate-cards" element={<PricingRateCards />} />
       <Route path="/jira-integration" element={<JiraIntegration />} />
+      <Route path="/concur-integration" element={<ConcurIntegration />} />
       <Route path="/" element={token ? <Navigate to="/dashboard" /> : <Landing />} />
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>

@@ -23,6 +23,7 @@ import { p2pRoutes } from './p2p/p2p.routes.js';
 import bamboohrRoutes from './integration/bamboohr.routes.js';
 import jiraRoutes from './integration/jira.routes.js';
 import occRoutes from './integration/occ.routes.js';
+import concurRoutes from './integration/concur.routes.js';
 import apRoutes from './ap-portal/ap.routes.js';
 import attachmentRoutes from './core/attachments.routes.js';
 import { processWebhookEvent } from './q2c/docusign.service.js';
@@ -135,6 +136,7 @@ async function buildServer() {
   await fastify.register(bamboohrRoutes);
   await fastify.register(jiraRoutes);
   await fastify.register(occRoutes);
+  await fastify.register(concurRoutes);
   await fastify.register(apRoutes);
   await fastify.register(attachmentRoutes);
   await fastify.register(leaseRoutes, { prefix: '/api/v1/leases' });

@@ -124,6 +124,7 @@ const SECTIONS: NavSection[] = [
     label: 'Integrations',
     items: [
       { label: 'OCC Billing', path: '/occ-billing' },
+      { label: 'Concur Expenses', path: '/concur-integration' },
     ],
   },
   {
