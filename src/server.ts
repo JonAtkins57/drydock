@@ -13,6 +13,7 @@ import authRoutes from './core/auth.routes.js';
 import customFieldsRoutes from './core/custom-fields.routes.js';
 import picklistsRoutes from './core/picklists.routes.js';
 import glRoutes from './gl/gl.routes.js';
+import glReportsRoutes from './gl/reports.routes.js';
 import { customerRoutes } from './master/customers.routes.js';
 import { vendorRoutes } from './master/vendors.routes.js';
 import { registerEntityRoutes } from './master/entities.routes.js';
@@ -109,6 +110,7 @@ async function buildServer() {
   await fastify.register(customFieldsRoutes);
   await fastify.register(picklistsRoutes);
   await fastify.register(glRoutes);
+  await fastify.register(glReportsRoutes);
   await fastify.register(customerRoutes, { prefix: '/api/v1/customers' });
   await fastify.register(vendorRoutes, { prefix: '/api/v1/vendors' });
   await fastify.register(registerEntityRoutes);

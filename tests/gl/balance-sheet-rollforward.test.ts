@@ -17,7 +17,7 @@ vi.mock('../../src/db/connection.js', () => ({
 }));
 
 // Import after mocks
-import { getBalanceSheetRollForward } from '../../src/gl/balance-sheet-rollforward.js';
+import { getBalanceSheetRollForward } from '../../src/gl/reports/balance-sheet-rollforward.js';
 
 // ── Constants ──────────────────────────────────────────────────────
 

@@ -1,6 +1,31 @@
-import { pool } from '../db/connection.js';
-import { ok, err, type Result, type AppError } from '../lib/result.js';
-import type { RollForwardRow } from './gl.schemas.js';
+import { z } from 'zod';
+import { pool } from '../../db/connection.js';
+import { ok, err, type Result, type AppError } from '../../lib/result.js';
+
+// ── Schemas ────────────────────────────────────────────────────────
+
+export const balanceSheetRollForwardQuerySchema = z.object({
+  periodId: z.string().uuid(),
+  accountType: z.enum(['asset', 'liability', 'equity']).optional(),
+});
+export type BalanceSheetRollForwardQuery = z.infer<typeof balanceSheetRollForwardQuerySchema>;
+
+export interface RollForwardRow {
+  accountId: string;
+  accountNumber: string;
+  accountName: string;
+  accountType: string;
+  beginningBalance: number;
+  periodDebits: number;
+  periodCredits: number;
+  endingBalance: number;
+}
+
+export interface RollForwardResult {
+  rows: RollForwardRow[];
+}
+
+// ── Service ────────────────────────────────────────────────────────
 
 export async function getBalanceSheetRollForward(
   tenantId: string,
@@ -23,7 +48,9 @@ export async function getBalanceSheetRollForward(
 
     const { start_date, end_date } = periodRes.rows[0];
 
-    // Phase 2: conditional aggregation — single pass
+    // Phase 2: LEFT JOIN so accounts with zero activity still appear with zero balances.
+    // Journal entry conditions are pushed into the ON clause so the LEFT JOIN is preserved
+    // (moving them to WHERE would convert it back to an INNER JOIN).
     // Params: $1=tenantId, $2=periodId, $3=startDate, $4=endDate, $5..=accountTypes
     const accountTypes = accountType ? [accountType] : ['asset', 'liability', 'equity'];
     const placeholders = accountTypes.map((_, i) => `$${i + 5}`).join(', ');
@@ -52,14 +79,15 @@ export async function getBalanceSheetRollForward(
             (COALESCE(SUM(jel.credit_amount), 0) - COALESCE(SUM(jel.debit_amount),  0))::bigint
         END AS ending_balance
       FROM drydock_gl.accounts a
-      INNER JOIN drydock_gl.journal_entry_lines jel ON jel.account_id = a.id
-      INNER JOIN drydock_gl.journal_entries je ON je.id = jel.journal_entry_id
+      LEFT JOIN drydock_gl.journal_entry_lines jel ON jel.account_id = a.id
+      LEFT JOIN drydock_gl.journal_entries je
+             ON je.id = jel.journal_entry_id
+            AND je.tenant_id = $1
+            AND je.status = 'posted'
+            AND je.posting_date <= $4::timestamptz
       WHERE a.tenant_id = $1
         AND a.is_active = true
         AND a.account_type IN (${placeholders})
-        AND je.tenant_id = $1
-        AND je.status = 'posted'
-        AND je.posting_date <= $4::timestamptz
       GROUP BY a.id, a.account_number, a.name, a.account_type
       ORDER BY a.account_type, a.account_number
     `;
