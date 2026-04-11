@@ -31,6 +31,8 @@ import { assetRoutes } from './asset/asset.routes.js';
 import { workOrderRoutes } from './work-orders/work-orders.routes.js';
 import { budgetingRoutes } from './budgeting/budgeting.routes.js';
 import { forecastRoutes } from './budgeting/forecasts.routes.js';
+import { kpiRoutes } from './reports/kpi.routes.js';
+import { dashboardRoutes } from './reports/dashboards.routes.js';
 import type { AppErrorCode } from './lib/result.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -130,6 +132,8 @@ async function buildServer() {
   await fastify.register(workOrderRoutes, { prefix: '/api/v1/work-orders' });
   await fastify.register(budgetingRoutes, { prefix: '/api/v1/budgets' });
   await fastify.register(forecastRoutes, { prefix: '/api/v1/forecasts' });
+  await fastify.register(kpiRoutes, { prefix: '/api/v1/kpis' });
+  await fastify.register(dashboardRoutes, { prefix: '/api/v1/dashboards' });
 
   // ── DocuSign Connect Webhook ──────────────────────────────────────
   // Encapsulated scope so the buffer content-type parser only applies here.

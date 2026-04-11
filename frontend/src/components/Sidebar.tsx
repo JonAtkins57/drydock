@@ -99,6 +99,12 @@ const SECTIONS: NavSection[] = [
     ],
   },
   {
+    label: 'Analytics',
+    items: [
+      { label: 'KPI Dashboards', path: '/kpi-dashboards' },
+    ],
+  },
+  {
     label: 'Settings',
     items: [
       { label: 'Custom Fields', path: '/custom-fields' },

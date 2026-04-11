@@ -312,6 +312,15 @@ export const endpoints = {
   },
   createForecast: (data: unknown) => api('/forecasts', { method: 'POST', body: data }),
 
+  // KPI Dashboards
+  kpis: (from: string, to: string) =>
+    api<{ data: unknown[]; from: string; to: string }>(`/kpis?from=${from}&to=${to}`),
+  dashboards: () => api<{ data: unknown[] }>('/dashboards'),
+  createDashboard: (data: unknown) => api('/dashboards', { method: 'POST', body: data }),
+  getDashboard: (id: string) => api(`/dashboards/${id}`),
+  updateDashboard: (id: string, data: unknown) => api(`/dashboards/${id}`, { method: 'PUT', body: data }),
+  deleteDashboard: (id: string) => api(`/dashboards/${id}`, { method: 'DELETE' }),
+
   // Attachments
   listAttachments: (entityType: string, entityId: string): Promise<AttachmentRow[]> => {
     const token = localStorage.getItem('drydock_token');
