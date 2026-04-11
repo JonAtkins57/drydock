@@ -271,10 +271,8 @@ export async function inventoryRoutes(fastify: FastifyInstance): Promise<void> {
       }
     }
 
-    // Bug fix 6: sign totalCost — negative for issues (inventory leaving)
-    const signedTotalCost = transactionType === 'issue'
-      ? -(quantity * unitCost)
-      : quantity * unitCost;
+    // totalCost is always positive — it represents cost of goods moved
+    const totalCost = quantity * unitCost;
 
     // Bug fix 1: wrap all inserts/updates in a single DB transaction.
     let txRecord;
@@ -290,7 +288,7 @@ export async function inventoryRoutes(fastify: FastifyInstance): Promise<void> {
             fromWarehouseId: fromWarehouseId ?? null,
             quantity: String(quantity),
             unitCost: String(unitCost),
-            totalCost: String(signedTotalCost),
+            totalCost: String(totalCost),
             notes: notes ?? null,
             referenceNumber: referenceNumber ?? null,
             transactionDate: transactionDate ? new Date(transactionDate) : new Date(),
