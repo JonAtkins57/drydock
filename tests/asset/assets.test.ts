@@ -80,10 +80,14 @@ const ASSET_ID = '33333333-4444-5555-6666-777777777777';
 async function buildApp() {
   const app = Fastify();
   app.decorateRequest('currentUser', {
-    sub: USER_ID,
-    tenantId: TENANT_ID,
-    email: 'test@example.com',
-    permissions: [],
+    getter() {
+      return {
+        sub: USER_ID,
+        tenantId: TENANT_ID,
+        email: 'test@example.com',
+        permissions: [],
+      };
+    },
   });
   await app.register(assetRoutes, { prefix: '/' });
   await app.ready();

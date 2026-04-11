@@ -29,7 +29,7 @@ const createAssetSchema = z.object({
 // ── Plugin ─────────────────────────────────────────────────────────
 
 export async function assetRoutes(fastify: FastifyInstance): Promise<void> {
-  fastify.addHook('onRequest', authenticateHook);
+  fastify.addHook('preHandler', authenticateHook);
   fastify.addHook('preHandler', setTenantContext);
 
   // GET / — list fixed assets

@@ -50,17 +50,14 @@ CREATE TABLE drydock_asset.asset_depreciation_books (
   tenant_id uuid NOT NULL,
   asset_id uuid NOT NULL REFERENCES drydock_asset.fixed_assets(id),
   book_type drydock_asset.book_type NOT NULL,
-  depreciation_method drydock_asset.depreciation_method NOT NULL,
-  useful_life_months integer NOT NULL,
-  salvage_value integer NOT NULL DEFAULT 0,
-  accumulated_depreciation integer NOT NULL DEFAULT 0,
-  net_book_value integer NOT NULL,
-  last_depreciation_date timestamptz,
-  is_active boolean NOT NULL DEFAULT true,
+  period_date date NOT NULL,
+  beginning_book_value integer NOT NULL,
+  depreciation_expense integer NOT NULL,
+  accumulated_depreciation integer NOT NULL,
+  ending_book_value integer NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
-  created_by uuid,
-  updated_by uuid
+  created_by uuid
 );
 
 CREATE INDEX idx_asset_depreciation_books_tenant_id ON drydock_asset.asset_depreciation_books (tenant_id);
@@ -73,7 +70,7 @@ CREATE TABLE drydock_asset.asset_disposals (
   disposal_date timestamptz NOT NULL,
   proceeds_amount integer NOT NULL DEFAULT 0,
   net_book_value_at_disposal integer NOT NULL,
-  gain_loss integer NOT NULL DEFAULT 0,
+  gain_loss_amount integer NOT NULL DEFAULT 0,
   notes text,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
