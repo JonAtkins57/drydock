@@ -1,0 +1,86 @@
+import { pgSchema, uuid, text, integer, boolean, timestamp } from 'drizzle-orm/pg-core';
+
+export const assetSchema = pgSchema('drydock_asset');
+
+// ── Enums ─────────────────────────────────────────────────────────
+
+export const assetClassEnum = assetSchema.enum('asset_class', [
+  'land', 'building', 'equipment', 'vehicle', 'furniture', 'software', 'other',
+]);
+
+export const depreciationMethodEnum = assetSchema.enum('depreciation_method', [
+  'straight_line', 'declining_balance', 'units_of_production',
+]);
+
+export const assetStatusEnum = assetSchema.enum('asset_status', [
+  'active', 'disposed', 'fully_depreciated',
+]);
+
+export const bookTypeEnum = assetSchema.enum('book_type', [
+  'tax', 'gaap', 'internal',
+]);
+
+export const disposalTypeEnum = assetSchema.enum('disposal_type', [
+  'sale', 'scrap', 'donation', 'write_off',
+]);
+
+// ── Fixed Assets ──────────────────────────────────────────────────
+
+export const fixedAssets = assetSchema.table('fixed_assets', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  assetNumber: text('asset_number').notNull(),
+  name: text('name').notNull(),
+  description: text('description'),
+  assetClass: assetClassEnum('asset_class').notNull(),
+  status: assetStatusEnum('status').notNull().default('active'),
+  acquisitionDate: timestamp('acquisition_date', { withTimezone: true }).notNull(),
+  acquisitionCost: integer('acquisition_cost').notNull(),
+  salvageValue: integer('salvage_value').notNull().default(0),
+  usefulLifeMonths: integer('useful_life_months').notNull(),
+  depreciationMethod: depreciationMethodEnum('depreciation_method').notNull(),
+  locationId: uuid('location_id'),
+  departmentId: uuid('department_id'),
+  isActive: boolean('is_active').notNull().default(true),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  createdBy: uuid('created_by'),
+  updatedBy: uuid('updated_by'),
+});
+
+// ── Asset Depreciation Books ──────────────────────────────────────
+
+export const assetDepreciationBooks = assetSchema.table('asset_depreciation_books', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  assetId: uuid('asset_id').notNull().references(() => fixedAssets.id),
+  bookType: bookTypeEnum('book_type').notNull(),
+  depreciationMethod: depreciationMethodEnum('depreciation_method').notNull(),
+  usefulLifeMonths: integer('useful_life_months').notNull(),
+  salvageValue: integer('salvage_value').notNull().default(0),
+  accumulatedDepreciation: integer('accumulated_depreciation').notNull().default(0),
+  netBookValue: integer('net_book_value').notNull(),
+  lastDepreciationDate: timestamp('last_depreciation_date', { withTimezone: true }),
+  isActive: boolean('is_active').notNull().default(true),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  createdBy: uuid('created_by'),
+  updatedBy: uuid('updated_by'),
+});
+
+// ── Asset Disposals ───────────────────────────────────────────────
+
+export const assetDisposals = assetSchema.table('asset_disposals', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  assetId: uuid('asset_id').notNull().references(() => fixedAssets.id),
+  disposalType: disposalTypeEnum('disposal_type').notNull(),
+  disposalDate: timestamp('disposal_date', { withTimezone: true }).notNull(),
+  proceedsAmount: integer('proceeds_amount').notNull().default(0),
+  netBookValueAtDisposal: integer('net_book_value_at_disposal').notNull(),
+  gainLoss: integer('gain_loss').notNull().default(0),
+  notes: text('notes'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  createdBy: uuid('created_by'),
+});
