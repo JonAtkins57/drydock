@@ -24,6 +24,7 @@ import apRoutes from './ap-portal/ap.routes.js';
 import attachmentRoutes from './core/attachments.routes.js';
 import { processWebhookEvent } from './q2c/docusign.service.js';
 import { validateDocuSignHmac } from './integration/docusign.js';
+import { setupRecurringWorker } from './gl/recurring.worker.js';
 import type { AppErrorCode } from './lib/result.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -234,6 +235,9 @@ async function start() {
   try {
     await fastify.listen({ port: PORT, host: HOST });
     fastify.log.info(`Server listening on ${HOST}:${PORT}`);
+    setupRecurringWorker(process.env.REDIS_URL ?? '').catch((err) => {
+      fastify.log.error({ err }, '[recurring-worker] Failed to start');
+    });
   } catch (err) {
     fastify.log.error(err);
     process.exit(1);

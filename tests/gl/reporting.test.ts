@@ -2,8 +2,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mock pool ──────────────────────────────────────────────────────
 
-const mockQuery = vi.fn();
-const mockRelease = vi.fn();
+const { mockQuery, mockRelease } = vi.hoisted(() => ({
+  mockQuery: vi.fn(),
+  mockRelease: vi.fn(),
+}));
 
 vi.mock('../../src/db/connection.js', () => ({
   pool: {
