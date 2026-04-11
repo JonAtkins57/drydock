@@ -291,6 +291,27 @@ export const endpoints = {
   addWorkOrderPart: (id: string, data: unknown) => api(`/work-orders/${id}/parts`, { method: 'POST', body: data }),
   addWorkOrderTimeLog: (id: string, data: unknown) => api(`/work-orders/${id}/time-logs`, { method: 'POST', body: data }),
 
+  // Budgets
+  budgets: (page = 1, pageSize = 50) =>
+    api<{ data: unknown[]; meta: { total: number; page: number; pageSize: number; totalPages: number } }>(
+      `/budgets?page=${page}&pageSize=${pageSize}`
+    ),
+  createBudget: (data: unknown) => api('/budgets', { method: 'POST', body: data }),
+  getBudget: (id: string) => api(`/budgets/${id}`),
+  addBudgetLine: (id: string, data: unknown) => api(`/budgets/${id}/lines`, { method: 'POST', body: data }),
+  getBudgetVariance: (id: string) => api(`/budgets/${id}/variance`),
+
+  // Forecasts
+  forecasts: (page = 1, pageSize = 50, params?: { fiscalYear?: number; budgetId?: string }) => {
+    const qs = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
+    if (params?.fiscalYear) qs.set('fiscalYear', String(params.fiscalYear));
+    if (params?.budgetId) qs.set('budgetId', params.budgetId);
+    return api<{ data: unknown[]; meta: { total: number; page: number; pageSize: number; totalPages: number } }>(
+      `/forecasts?${qs.toString()}`
+    );
+  },
+  createForecast: (data: unknown) => api('/forecasts', { method: 'POST', body: data }),
+
   // Attachments
   listAttachments: (entityType: string, entityId: string): Promise<AttachmentRow[]> => {
     const token = localStorage.getItem('drydock_token');

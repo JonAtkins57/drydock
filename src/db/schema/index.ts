@@ -11,3 +11,4 @@ export * from '../../q2c/rev-rec.schema.js';
 export * from './lease.js';
 export * from './asset.js';
 export * from './work-orders.js';
+export * from './budgeting.js';

@@ -35,6 +35,7 @@ import RecurringJournals from './pages/RecurringJournals';
 import BalanceSheetRollForward from './pages/reports/BalanceSheetRollForward';
 import LeaseContracts from './pages/LeaseContracts';
 import WorkOrders from './pages/WorkOrders';
+import Budgets from './pages/Budgets';
 
 export default function App() {
   const { init, token } = useAuth();
@@ -81,6 +82,7 @@ export default function App() {
       <Route path="/leases" element={<LeaseContracts />} />
       <Route path="/assets" element={<FixedAssets />} />
       <Route path="/work-orders" element={<WorkOrders />} />
+      <Route path="/budgets" element={<Budgets />} />
       <Route path="/" element={token ? <Navigate to="/dashboard" /> : <Landing />} />
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>

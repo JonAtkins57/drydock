@@ -93,6 +93,12 @@ const SECTIONS: NavSection[] = [
     ],
   },
   {
+    label: 'Planning',
+    items: [
+      { label: 'Budgets', path: '/budgets' },
+    ],
+  },
+  {
     label: 'Settings',
     items: [
       { label: 'Custom Fields', path: '/custom-fields' },

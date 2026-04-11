@@ -45,15 +45,15 @@ export async function forecastRoutes(fastify: FastifyInstance): Promise<void> {
     const { page, pageSize, fiscalYear, budgetId } = query.data;
     const offset = (page - 1) * pageSize;
 
-    const conditions = [eq(forecasts.tenantId, tenantId)];
-    if (fiscalYear !== undefined) {
-      conditions.push(eq(forecasts.fiscalYear, fiscalYear));
-    }
-    if (budgetId !== undefined) {
-      conditions.push(eq(forecasts.budgetId, budgetId));
-    }
-
-    const where = and(...conditions);
+    const tenantFilter = eq(forecasts.tenantId, tenantId);
+    const where =
+      fiscalYear !== undefined && budgetId !== undefined
+        ? and(tenantFilter, eq(forecasts.fiscalYear, fiscalYear), eq(forecasts.budgetId, budgetId))
+        : fiscalYear !== undefined
+          ? and(tenantFilter, eq(forecasts.fiscalYear, fiscalYear))
+          : budgetId !== undefined
+            ? and(tenantFilter, eq(forecasts.budgetId, budgetId))
+            : tenantFilter;
 
     const [totalResult, rows] = await Promise.all([
       db.select({ value: count() }).from(forecasts).where(where),
