@@ -424,7 +424,7 @@ export async function creditMemoRoutes(fastify: FastifyInstance): Promise<void> 
 
   // POST /:id/actions/reject — pending_approval → rejected
   fastify.post('/:id/actions/reject', async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
-    const { tenantId } = request.currentUser;
+    const { tenantId, sub: userId } = request.currentUser;
     const { id } = request.params;
 
     const [memo] = await db
@@ -450,6 +450,103 @@ export async function creditMemoRoutes(fastify: FastifyInstance): Promise<void> 
       .where(and(eq(creditMemos.id, id), eq(creditMemos.tenantId, tenantId)))
       .returning();
 
+    await logAction({
+      tenantId,
+      userId,
+      action: 'reject',
+      entityType: 'credit_memo',
+      entityId: id,
+      changes: { from: 'pending_approval', to: 'rejected' },
+    });
+
     return reply.send(updated);
+  });
+
+  // POST /:id/actions/apply — apply approved credit to an open invoice
+  fastify.post('/:id/actions/apply', async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    const parsed = applySchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(422).send({
+        error: 'VALIDATION',
+        message: 'Invalid request body',
+        details: parsed.error.flatten().fieldErrors,
+      });
+    }
+
+    const { tenantId, sub: userId } = request.currentUser;
+    const { id } = request.params;
+    const { invoiceId, amount } = parsed.data;
+
+    const [memo] = await db
+      .select()
+      .from(creditMemos)
+      .where(and(eq(creditMemos.id, id), eq(creditMemos.tenantId, tenantId)))
+      .limit(1);
+
+    if (!memo) {
+      return reply.status(404).send({ error: 'NOT_FOUND', message: 'Credit memo not found' });
+    }
+
+    if (memo.status !== 'approved') {
+      return reply.status(422).send({
+        error: 'VALIDATION',
+        message: 'Credit memo must be in approved status to apply',
+      });
+    }
+
+    const [invoice] = await db
+      .select()
+      .from(invoices)
+      .where(and(eq(invoices.id, invoiceId), eq(invoices.tenantId, tenantId)))
+      .limit(1);
+
+    if (!invoice) {
+      return reply.status(404).send({ error: 'NOT_FOUND', message: 'Invoice not found' });
+    }
+
+    if (invoice.status !== 'posted' && invoice.status !== 'sent' && invoice.status !== 'overdue') {
+      return reply.status(422).send({
+        error: 'VALIDATION',
+        message: 'Invoice must be open (posted, sent, or overdue) to apply a credit memo',
+      });
+    }
+
+    // Compute already-applied total for this credit memo
+    const [appliedResult] = await db
+      .select({ total: sum(creditMemoApplications.amount) })
+      .from(creditMemoApplications)
+      .where(eq(creditMemoApplications.creditMemoId, id));
+
+    const alreadyApplied = Number(appliedResult?.total ?? 0);
+    const remaining = memo.totalAmount - alreadyApplied;
+
+    if (amount > remaining) {
+      return reply.status(422).send({
+        error: 'VALIDATION',
+        message: `Amount (${amount}) exceeds remaining unapplied balance (${remaining})`,
+      });
+    }
+
+    const [application] = await db
+      .insert(creditMemoApplications)
+      .values({
+        tenantId,
+        creditMemoId: id,
+        invoiceId,
+        amount,
+        appliedBy: userId,
+      })
+      .returning();
+
+    await logAction({
+      tenantId,
+      userId,
+      action: 'update',
+      entityType: 'credit_memo',
+      entityId: id,
+      changes: { action: 'apply', invoiceId, amount, applicationId: application.id },
+    });
+
+    return reply.status(201).send(application);
   });
 }
