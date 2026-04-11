@@ -73,6 +73,12 @@ const SECTIONS: NavSection[] = [
     ],
   },
   {
+    label: 'Lease Accounting',
+    items: [
+      { label: 'Lease Contracts', path: '/leases' },
+    ],
+  },
+  {
     label: 'Settings',
     items: [
       { label: 'Custom Fields', path: '/custom-fields' },
