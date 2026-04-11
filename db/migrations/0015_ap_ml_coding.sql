@@ -8,6 +8,7 @@ CREATE TABLE drydock_ap.coding_suggestions (
   vendor_id UUID NOT NULL,
   description_tokens TEXT NOT NULL,
   suggestions JSONB NOT NULL DEFAULT '[]'::jsonb,
+  suggestions JSONB NOT NULL DEFAULT '[]',
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

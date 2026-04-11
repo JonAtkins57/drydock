@@ -1,0 +1,344 @@
+import { useEffect, useState, type FormEvent } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../lib/store';
+import { endpoints } from '../lib/api';
+import Sidebar from '../components/Sidebar';
+
+interface InventoryItem {
+  id: string;
+  itemId: string;
+  warehouseId: string;
+  quantityOnHand: string;
+  quantityReserved: string;
+  quantityAvailable: string;
+  unitCost: string;
+  totalCost: string;
+  createdAt: string;
+}
+
+interface Warehouse {
+  id: string;
+  name: string;
+  code: string;
+}
+
+export default function Inventory() {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const [items, setItems] = useState<InventoryItem[]>([]);
+  const [warehouseList, setWarehouseList] = useState<Warehouse[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [showCreate, setShowCreate] = useState(false);
+  const [warehouseFilter, setWarehouseFilter] = useState('');
+
+  // Create form
+  const [transactionType, setTransactionType] = useState('receipt');
+  const [itemId, setItemId] = useState('');
+  const [warehouseId, setWarehouseId] = useState('');
+  const [fromWarehouseId, setFromWarehouseId] = useState('');
+  const [quantity, setQuantity] = useState('');
+  const [unitCost, setUnitCost] = useState('');
+  const [totalCost, setTotalCost] = useState('');
+  const [notes, setNotes] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [formError, setFormError] = useState('');
+
+  useEffect(() => {
+    if (!user) { navigate('/login'); return; }
+    loadWarehouses();
+    load();
+  }, [user, navigate]);
+
+  useEffect(() => {
+    load();
+  }, [warehouseFilter]);
+
+  const loadWarehouses = async () => {
+    try {
+      const res = await endpoints.warehouses(1, 200);
+      setWarehouseList((res as { data: Warehouse[] }).data);
+    } catch { /* */ }
+  };
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const res = await endpoints.inventoryItems(1, 50, warehouseFilter || undefined);
+      setItems((res as { data: InventoryItem[]; meta: { total: number } }).data);
+      setTotal((res as { data: InventoryItem[]; meta: { total: number } }).meta.total);
+    } catch { /* */ }
+    setLoading(false);
+  };
+
+  const handleCreate = async (e: FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    setFormError('');
+    try {
+      const body: Record<string, unknown> = {
+        transactionType,
+        itemId: itemId.trim(),
+        warehouseId: warehouseId.trim(),
+        quantity: parseFloat(quantity),
+        unitCost: parseFloat(unitCost),
+        totalCost: parseFloat(totalCost),
+        notes: notes.trim() || undefined,
+      };
+      if (transactionType === 'transfer') {
+        body.fromWarehouseId = fromWarehouseId.trim();
+      }
+      await endpoints.createInventoryTransaction(body);
+      setShowCreate(false);
+      resetForm();
+      load();
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : 'Failed to create transaction');
+    }
+    setSubmitting(false);
+  };
+
+  const resetForm = () => {
+    setTransactionType('receipt');
+    setItemId('');
+    setWarehouseId('');
+    setFromWarehouseId('');
+    setQuantity('');
+    setUnitCost('');
+    setTotalCost('');
+    setNotes('');
+    setFormError('');
+  };
+
+  if (!user) return null;
+
+  return (
+    <div className="flex min-h-screen bg-drydock-bg">
+      <Sidebar />
+      <main className="flex-1 p-8">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="text-2xl font-medium text-drydock-text">Inventory</h1>
+            <p className="text-drydock-text-dim text-sm mt-1">{total} total</p>
+          </div>
+          <button
+            onClick={() => setShowCreate(true)}
+            className="px-4 py-2 text-sm bg-drydock-accent hover:bg-drydock-accent-dim
+              text-drydock-dark font-medium rounded-md transition-colors"
+          >
+            + New Transaction
+          </button>
+        </div>
+
+        {/* Warehouse Filter */}
+        <div className="mb-4">
+          <select
+            value={warehouseFilter}
+            onChange={(e) => setWarehouseFilter(e.target.value)}
+            className="px-3 py-2 bg-drydock-bg border border-drydock-border rounded-md
+              text-drydock-text text-sm focus:outline-none focus:border-drydock-accent focus:ring-1 focus:ring-drydock-accent/30"
+          >
+            <option value="">All Warehouses</option>
+            {warehouseList.map((w) => (
+              <option key={w.id} value={w.id}>{w.name} ({w.code})</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Create Modal */}
+        {showCreate && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/60" onClick={() => { setShowCreate(false); resetForm(); }} />
+            <div className="relative bg-drydock-card border border-drydock-border rounded-lg p-6 w-full max-w-lg shadow-2xl">
+              <h2 className="text-lg font-medium text-drydock-text mb-4">New Transaction</h2>
+
+              {formError && (
+                <div className="mb-4 p-3 rounded bg-red-900/30 border border-red-700/50 text-red-300 text-sm">{formError}</div>
+              )}
+
+              <form onSubmit={handleCreate} className="space-y-4">
+                <div>
+                  <label className="block text-sm text-drydock-text-dim mb-1">Transaction Type</label>
+                  <select
+                    value={transactionType}
+                    onChange={(e) => setTransactionType(e.target.value)}
+                    required
+                    className="w-full px-3 py-2 bg-drydock-bg border border-drydock-border rounded-md
+                      text-drydock-text focus:outline-none focus:border-drydock-accent focus:ring-1 focus:ring-drydock-accent/30"
+                  >
+                    <option value="receipt">Receipt</option>
+                    <option value="issue">Issue</option>
+                    <option value="adjustment">Adjustment</option>
+                    <option value="transfer">Transfer</option>
+                    <option value="count">Count</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm text-drydock-text-dim mb-1">Item ID (UUID)</label>
+                  <input
+                    type="text"
+                    value={itemId}
+                    onChange={(e) => setItemId(e.target.value)}
+                    required
+                    autoFocus
+                    className="w-full px-3 py-2 bg-drydock-bg border border-drydock-border rounded-md
+                      text-drydock-text placeholder-drydock-steel
+                      focus:outline-none focus:border-drydock-accent focus:ring-1 focus:ring-drydock-accent/30"
+                    placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-drydock-text-dim mb-1">Warehouse ID (UUID)</label>
+                  <input
+                    type="text"
+                    value={warehouseId}
+                    onChange={(e) => setWarehouseId(e.target.value)}
+                    required
+                    className="w-full px-3 py-2 bg-drydock-bg border border-drydock-border rounded-md
+                      text-drydock-text placeholder-drydock-steel
+                      focus:outline-none focus:border-drydock-accent focus:ring-1 focus:ring-drydock-accent/30"
+                    placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                  />
+                </div>
+                {transactionType === 'transfer' && (
+                  <div>
+                    <label className="block text-sm text-drydock-text-dim mb-1">From Warehouse ID (UUID)</label>
+                    <input
+                      type="text"
+                      value={fromWarehouseId}
+                      onChange={(e) => setFromWarehouseId(e.target.value)}
+                      required
+                      className="w-full px-3 py-2 bg-drydock-bg border border-drydock-border rounded-md
+                        text-drydock-text placeholder-drydock-steel
+                        focus:outline-none focus:border-drydock-accent focus:ring-1 focus:ring-drydock-accent/30"
+                      placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                    />
+                  </div>
+                )}
+                <div>
+                  <label className="block text-sm text-drydock-text-dim mb-1">Quantity</label>
+                  <input
+                    type="number"
+                    step="any"
+                    value={quantity}
+                    onChange={(e) => setQuantity(e.target.value)}
+                    required
+                    min="0.000001"
+                    className="w-full px-3 py-2 bg-drydock-bg border border-drydock-border rounded-md
+                      text-drydock-text placeholder-drydock-steel
+                      focus:outline-none focus:border-drydock-accent focus:ring-1 focus:ring-drydock-accent/30"
+                    placeholder="0"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-drydock-text-dim mb-1">Unit Cost</label>
+                  <input
+                    type="number"
+                    step="any"
+                    value={unitCost}
+                    onChange={(e) => setUnitCost(e.target.value)}
+                    required
+                    className="w-full px-3 py-2 bg-drydock-bg border border-drydock-border rounded-md
+                      text-drydock-text placeholder-drydock-steel
+                      focus:outline-none focus:border-drydock-accent focus:ring-1 focus:ring-drydock-accent/30"
+                    placeholder="0.00"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-drydock-text-dim mb-1">Total Cost</label>
+                  <input
+                    type="number"
+                    step="any"
+                    value={totalCost}
+                    onChange={(e) => setTotalCost(e.target.value)}
+                    required
+                    className="w-full px-3 py-2 bg-drydock-bg border border-drydock-border rounded-md
+                      text-drydock-text placeholder-drydock-steel
+                      focus:outline-none focus:border-drydock-accent focus:ring-1 focus:ring-drydock-accent/30"
+                    placeholder="0.00"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-drydock-text-dim mb-1">Notes</label>
+                  <textarea
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    rows={2}
+                    className="w-full px-3 py-2 bg-drydock-bg border border-drydock-border rounded-md
+                      text-drydock-text placeholder-drydock-steel
+                      focus:outline-none focus:border-drydock-accent focus:ring-1 focus:ring-drydock-accent/30"
+                    placeholder="Optional notes"
+                  />
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => { setShowCreate(false); resetForm(); }}
+                    className="flex-1 py-2 px-4 text-sm text-drydock-steel border border-drydock-border rounded-md
+                      hover:text-drydock-text hover:border-drydock-steel transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={submitting || !itemId.trim() || !warehouseId.trim() || !quantity}
+                    className="flex-1 py-2 px-4 text-sm bg-drydock-accent hover:bg-drydock-accent-dim
+                      text-drydock-dark font-medium rounded-md
+                      disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {submitting ? 'Creating...' : 'Create Transaction'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Table */}
+        <div className="bg-drydock-card border border-drydock-border rounded-lg overflow-hidden">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-drydock-border">
+                <th className="text-left px-5 py-3 text-xs text-drydock-steel uppercase tracking-wider font-medium">Item</th>
+                <th className="text-left px-5 py-3 text-xs text-drydock-steel uppercase tracking-wider font-medium">SKU</th>
+                <th className="text-left px-5 py-3 text-xs text-drydock-steel uppercase tracking-wider font-medium">Warehouse</th>
+                <th className="text-right px-5 py-3 text-xs text-drydock-steel uppercase tracking-wider font-medium">Qty On Hand</th>
+                <th className="text-right px-5 py-3 text-xs text-drydock-steel uppercase tracking-wider font-medium">Qty Reserved</th>
+                <th className="text-right px-5 py-3 text-xs text-drydock-steel uppercase tracking-wider font-medium">Qty Available</th>
+                <th className="text-right px-5 py-3 text-xs text-drydock-steel uppercase tracking-wider font-medium">Unit Cost</th>
+                <th className="text-right px-5 py-3 text-xs text-drydock-steel uppercase tracking-wider font-medium">Total Value</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                Array.from({ length: 3 }).map((_, i) => (
+                  <tr key={i} className="border-b border-drydock-border/50">
+                    {Array.from({ length: 8 }).map((_, j) => (
+                      <td key={j} className="px-5 py-3"><div className="h-4 bg-drydock-border/30 rounded animate-pulse w-24" /></td>
+                    ))}
+                  </tr>
+                ))
+              ) : items.length === 0 ? (
+                <tr><td colSpan={8} className="px-5 py-8 text-center text-drydock-steel">No inventory records found</td></tr>
+              ) : (
+                items.map((item) => (
+                  <tr key={item.id} className="border-b border-drydock-border/50 hover:bg-drydock-bg/50 transition-colors">
+                    <td className="px-5 py-3 text-sm font-mono text-drydock-accent">{item.itemId}</td>
+                    <td className="px-5 py-3 text-sm text-drydock-steel">—</td>
+                    <td className="px-5 py-3 text-sm text-drydock-steel">{item.warehouseId}</td>
+                    <td className="px-5 py-3 text-sm text-drydock-text text-right">{Number(item.quantityOnHand).toLocaleString()}</td>
+                    <td className="px-5 py-3 text-sm text-drydock-steel text-right">{Number(item.quantityReserved).toLocaleString()}</td>
+                    <td className="px-5 py-3 text-sm text-drydock-text text-right">{Number(item.quantityAvailable).toLocaleString()}</td>
+                    <td className="px-5 py-3 text-sm text-drydock-steel text-right">{Number(item.unitCost).toFixed(2)}</td>
+                    <td className="px-5 py-3 text-sm text-drydock-text text-right">{Number(item.totalCost).toFixed(2)}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </main>
+    </div>
+  );
+}

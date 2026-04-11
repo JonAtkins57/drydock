@@ -13,3 +13,8 @@ export * from './lease.js';
 export * from './asset.js';
 export * from './work-orders.js';
 export * from './budgeting.js';
+export * from './inventory.js';
+export * from './project-mgmt.js';
+export * from './dashboards.js';
+export * from './cash-forecast.js';
+export * from './usage-billing.js';

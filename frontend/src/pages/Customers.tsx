@@ -4,6 +4,7 @@ import { useAuth } from '../lib/store';
 import { endpoints } from '../lib/api';
 import Sidebar from '../components/Sidebar';
 import CreateCustomerModal from '../components/CreateCustomerModal';
+import RecordDrawer from '../components/RecordDrawer';
 
 interface Customer {
   id: string;
@@ -14,6 +15,22 @@ interface Customer {
   createdAt: string;
 }
 
+const CUSTOMER_FIELDS = [
+  { key: 'customerNumber', label: 'Customer #', readOnly: true },
+  { key: 'name', label: 'Name' },
+  { key: 'status', label: 'Status', type: 'select' as const, options: [
+    { value: 'active', label: 'Active' },
+    { value: 'inactive', label: 'Inactive' },
+    { value: 'prospect', label: 'Prospect' },
+  ]},
+  { key: 'currency', label: 'Currency' },
+  { key: 'creditLimit', label: 'Credit Limit', type: 'number' as const },
+  { key: 'paymentTermsId', label: 'Payment Terms ID' },
+  { key: 'billingAddress', label: 'Billing Address', type: 'textarea' as const },
+  { key: 'shippingAddress', label: 'Shipping Address', type: 'textarea' as const },
+  { key: 'createdAt', label: 'Created', readOnly: true },
+];
+
 export default function Customers() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -21,6 +38,8 @@ export default function Customers() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
+  const [search, setSearch] = useState('');
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) { navigate('/login'); return; }
@@ -29,12 +48,18 @@ export default function Customers() {
 
   const loadCustomers = async () => {
     try {
-      const res = await endpoints.customers(1, 50);
+      const res = await endpoints.customers(1, 100);
       setCustomers(res.data as Customer[]);
       setTotal(res.meta.total);
     } catch { /* */ }
     setLoading(false);
   };
+
+  const filtered = customers.filter((c) => {
+    if (!search) return true;
+    const q = search.toLowerCase();
+    return c.name.toLowerCase().includes(q) || c.customerNumber.toLowerCase().includes(q);
+  });
 
   if (!user) return null;
 
@@ -47,13 +72,23 @@ export default function Customers() {
             <h1 className="text-2xl font-medium text-drydock-text">Customers</h1>
             <p className="text-drydock-text-dim text-sm mt-1">{total} total</p>
           </div>
-          <button
-            onClick={() => setShowCreate(true)}
-            className="px-4 py-2 text-sm bg-drydock-accent hover:bg-drydock-accent-dim
-              text-drydock-dark font-medium rounded-md transition-colors"
-          >
-            + New Customer
-          </button>
+          <div className="flex items-center gap-3">
+            <input
+              type="search"
+              placeholder="Search customers…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="px-3 py-2 text-sm bg-drydock-bg border border-drydock-border rounded-md
+                text-drydock-text placeholder:text-drydock-steel focus:outline-none focus:border-drydock-accent w-52"
+            />
+            <button
+              onClick={() => setShowCreate(true)}
+              className="px-4 py-2 text-sm bg-drydock-accent hover:bg-drydock-accent-dim
+                text-drydock-dark font-medium rounded-md transition-colors"
+            >
+              + New Customer
+            </button>
+          </div>
         </div>
 
         <CreateCustomerModal
@@ -84,17 +119,21 @@ export default function Customers() {
                     ))}
                   </tr>
                 ))
-              ) : customers.length === 0 ? (
+              ) : filtered.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="px-5 py-8 text-center text-drydock-steel">
-                    No customers found
+                    {search ? 'No customers match your search' : 'No customers found'}
                   </td>
                 </tr>
               ) : (
-                customers.map((c) => (
-                  <tr key={c.id} className="border-b border-drydock-border/50 hover:bg-drydock-bg/50 transition-colors">
+                filtered.map((c) => (
+                  <tr
+                    key={c.id}
+                    onClick={() => setSelectedId(c.id)}
+                    className="border-b border-drydock-border/50 hover:bg-drydock-bg/50 transition-colors cursor-pointer"
+                  >
                     <td className="px-5 py-3 text-sm font-mono text-drydock-accent">{c.customerNumber}</td>
-                    <td className="px-5 py-3 text-sm text-drydock-text">{c.name}</td>
+                    <td className="px-5 py-3 text-sm text-drydock-text font-medium">{c.name}</td>
                     <td className="px-5 py-3">
                       <span className={`text-xs px-2 py-0.5 rounded-full ${
                         c.status === 'active'
@@ -113,6 +152,16 @@ export default function Customers() {
           </table>
         </div>
       </main>
+
+      <RecordDrawer
+        open={!!selectedId}
+        onClose={() => setSelectedId(null)}
+        entityPath="/customers"
+        recordId={selectedId}
+        fields={CUSTOMER_FIELDS}
+        title="Customer"
+        onSaved={loadCustomers}
+      />
     </div>
   );
 }

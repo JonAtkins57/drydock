@@ -3,14 +3,17 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/store';
 import { endpoints, api } from '../lib/api';
 import Sidebar from '../components/Sidebar';
+import RecordDrawer, { type FieldDef } from '../components/RecordDrawer';
 
 // ── Shared layout wrapper ──────────────────────────────────────────
 
-function PageShell({ title, count, children, onAdd }: {
+function PageShell({ title, count, children, onAdd, search, onSearch }: {
   title: string;
   count: number;
   children: React.ReactNode;
   onAdd?: () => void;
+  search?: string;
+  onSearch?: (v: string) => void;
 }) {
   return (
     <div className="flex min-h-screen bg-drydock-bg">
@@ -21,15 +24,27 @@ function PageShell({ title, count, children, onAdd }: {
             <h1 className="text-2xl font-medium text-drydock-text">{title}</h1>
             <p className="text-drydock-text-dim text-sm mt-1">{count} total</p>
           </div>
-          {onAdd && (
-            <button
-              onClick={onAdd}
-              className="px-4 py-2 text-sm bg-drydock-accent hover:bg-drydock-accent-dim
-                text-drydock-dark font-medium rounded-md transition-colors"
-            >
-              + New
-            </button>
-          )}
+          <div className="flex items-center gap-3">
+            {onSearch && (
+              <input
+                type="search"
+                placeholder={`Search ${title.toLowerCase()}…`}
+                value={search ?? ''}
+                onChange={(e) => onSearch(e.target.value)}
+                className="px-3 py-2 text-sm bg-drydock-bg border border-drydock-border rounded-md
+                  text-drydock-text placeholder:text-drydock-steel focus:outline-none focus:border-drydock-accent w-48"
+              />
+            )}
+            {onAdd && (
+              <button
+                onClick={onAdd}
+                className="px-4 py-2 text-sm bg-drydock-accent hover:bg-drydock-accent-dim
+                  text-drydock-dark font-medium rounded-md transition-colors"
+              >
+                + New
+              </button>
+            )}
+          </div>
         </div>
         {children}
       </main>
@@ -156,6 +171,20 @@ interface Employee {
   hireDate: string | null;
 }
 
+const EMPLOYEE_FIELDS: FieldDef[] = [
+  { key: 'employeeNumber', label: 'Employee #', readOnly: true },
+  { key: 'firstName', label: 'First Name' },
+  { key: 'lastName', label: 'Last Name' },
+  { key: 'email', label: 'Email', type: 'email' },
+  { key: 'status', label: 'Status', type: 'select', options: [
+    { value: 'active', label: 'Active' },
+    { value: 'inactive', label: 'Inactive' },
+    { value: 'terminated', label: 'Terminated' },
+  ]},
+  { key: 'hireDate', label: 'Hire Date', type: 'date' },
+  { key: 'createdAt', label: 'Created', readOnly: true },
+];
+
 export function EmployeesPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -163,6 +192,8 @@ export function EmployeesPage() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
+  const [search, setSearch] = useState('');
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) { navigate('/login'); return; }
@@ -171,17 +202,23 @@ export function EmployeesPage() {
 
   const loadData = async () => {
     try {
-      const res = await endpoints.employees(1, 50);
+      const res = await endpoints.employees(1, 100);
       setRows(res.data as Employee[]);
       setTotal(res.meta?.total ?? res.data.length);
     } catch { /* */ }
     setLoading(false);
   };
 
+  const filtered = rows.filter((r) => {
+    if (!search) return true;
+    const q = search.toLowerCase();
+    return `${r.firstName} ${r.lastName}`.toLowerCase().includes(q) || r.email.toLowerCase().includes(q) || r.employeeNumber.toLowerCase().includes(q);
+  });
+
   if (!user) return null;
 
   return (
-    <PageShell title="Employees" count={total} onAdd={() => setShowCreate(true)}>
+    <PageShell title="Employees" count={total} onAdd={() => setShowCreate(true)} search={search} onSearch={setSearch}>
       {showCreate && <CreateEmployeeModal onClose={() => setShowCreate(false)} onCreated={loadData} />}
       <div className="bg-drydock-card border border-drydock-border rounded-lg overflow-hidden">
         <table className="w-full">
@@ -195,11 +232,11 @@ export function EmployeesPage() {
             </tr>
           </thead>
           <tbody>
-            {loading ? <LoadingSkeleton cols={5} /> : rows.length === 0 ? (
-              <tr><td colSpan={5} className="px-5 py-8 text-center text-drydock-steel">No employees found</td></tr>
-            ) : rows.map((r) => (
-              <tr key={r.id} className="border-b border-drydock-border/50 hover:bg-drydock-bg/50 transition-colors">
-                <td className="px-5 py-3 text-sm text-drydock-text">{r.firstName} {r.lastName}</td>
+            {loading ? <LoadingSkeleton cols={5} /> : filtered.length === 0 ? (
+              <tr><td colSpan={5} className="px-5 py-8 text-center text-drydock-steel">{search ? 'No employees match your search' : 'No employees found'}</td></tr>
+            ) : filtered.map((r) => (
+              <tr key={r.id} onClick={() => setSelectedId(r.id)} className="border-b border-drydock-border/50 hover:bg-drydock-bg/50 transition-colors cursor-pointer">
+                <td className="px-5 py-3 text-sm text-drydock-text font-medium">{r.firstName} {r.lastName}</td>
                 <td className="px-5 py-3 text-sm text-drydock-text-dim">{r.email}</td>
                 <td className="px-5 py-3 text-sm font-mono text-drydock-accent">{r.employeeNumber}</td>
                 <td className="px-5 py-3"><StatusBadge status={r.status} /></td>
@@ -209,6 +246,8 @@ export function EmployeesPage() {
           </tbody>
         </table>
       </div>
+      <RecordDrawer open={!!selectedId} onClose={() => setSelectedId(null)} entityPath="/employees"
+        recordId={selectedId} fields={EMPLOYEE_FIELDS} title="Employee" onSaved={loadData} />
     </PageShell>
   );
 }
@@ -255,6 +294,21 @@ interface Item {
   listPrice: number | null;
 }
 
+const ITEM_FIELDS: FieldDef[] = [
+  { key: 'itemNumber', label: 'Item #', readOnly: true },
+  { key: 'name', label: 'Name' },
+  { key: 'description', label: 'Description', type: 'textarea' },
+  { key: 'itemType', label: 'Type', type: 'select', options: [
+    { value: 'service', label: 'Service' },
+    { value: 'inventory', label: 'Inventory' },
+    { value: 'non_inventory', label: 'Non-Inventory' },
+    { value: 'other', label: 'Other' },
+  ]},
+  { key: 'unitOfMeasure', label: 'Unit of Measure' },
+  { key: 'listPrice', label: 'List Price (cents)', type: 'number' },
+  { key: 'standardCost', label: 'Standard Cost (cents)', type: 'number' },
+];
+
 export function ItemsPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -262,6 +316,8 @@ export function ItemsPage() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
+  const [search, setSearch] = useState('');
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) { navigate('/login'); return; }
@@ -270,17 +326,23 @@ export function ItemsPage() {
 
   const loadData = async () => {
     try {
-      const res = await endpoints.items(1, 50);
+      const res = await endpoints.items(1, 100);
       setRows(res.data as Item[]);
       setTotal(res.meta?.total ?? res.data.length);
     } catch { /* */ }
     setLoading(false);
   };
 
+  const filtered = rows.filter((r) => {
+    if (!search) return true;
+    const q = search.toLowerCase();
+    return r.name.toLowerCase().includes(q) || r.itemNumber.toLowerCase().includes(q) || r.itemType.toLowerCase().includes(q);
+  });
+
   if (!user) return null;
 
   return (
-    <PageShell title="Items" count={total} onAdd={() => setShowCreate(true)}>
+    <PageShell title="Items" count={total} onAdd={() => setShowCreate(true)} search={search} onSearch={setSearch}>
       {showCreate && <CreateItemModal onClose={() => setShowCreate(false)} onCreated={loadData} />}
       <div className="bg-drydock-card border border-drydock-border rounded-lg overflow-hidden">
         <table className="w-full">
@@ -294,12 +356,12 @@ export function ItemsPage() {
             </tr>
           </thead>
           <tbody>
-            {loading ? <LoadingSkeleton cols={5} /> : rows.length === 0 ? (
-              <tr><td colSpan={5} className="px-5 py-8 text-center text-drydock-steel">No items found</td></tr>
-            ) : rows.map((r) => (
-              <tr key={r.id} className="border-b border-drydock-border/50 hover:bg-drydock-bg/50 transition-colors">
+            {loading ? <LoadingSkeleton cols={5} /> : filtered.length === 0 ? (
+              <tr><td colSpan={5} className="px-5 py-8 text-center text-drydock-steel">{search ? 'No items match your search' : 'No items found'}</td></tr>
+            ) : filtered.map((r) => (
+              <tr key={r.id} onClick={() => setSelectedId(r.id)} className="border-b border-drydock-border/50 hover:bg-drydock-bg/50 transition-colors cursor-pointer">
                 <td className="px-5 py-3 text-sm font-mono text-drydock-accent">{r.itemNumber}</td>
-                <td className="px-5 py-3 text-sm text-drydock-text">{r.name}</td>
+                <td className="px-5 py-3 text-sm text-drydock-text font-medium">{r.name}</td>
                 <td className="px-5 py-3 text-sm text-drydock-text-dim">{r.itemType}</td>
                 <td className="px-5 py-3 text-sm text-drydock-text-dim">{r.unitOfMeasure ?? '--'}</td>
                 <td className="px-5 py-3 text-sm text-drydock-text text-right">{centsToDisplay(r.listPrice)}</td>
@@ -308,6 +370,8 @@ export function ItemsPage() {
           </tbody>
         </table>
       </div>
+      <RecordDrawer open={!!selectedId} onClose={() => setSelectedId(null)} entityPath="/items"
+        recordId={selectedId} fields={ITEM_FIELDS} title="Item" onSaved={loadData} />
     </PageShell>
   );
 }
@@ -361,6 +425,15 @@ interface Location {
   isActive: boolean;
 }
 
+const LOCATION_FIELDS: FieldDef[] = [
+  { key: 'code', label: 'Code' },
+  { key: 'name', label: 'Name' },
+  { key: 'isActive', label: 'Status', type: 'select', options: [
+    { value: 'true', label: 'Active' },
+    { value: 'false', label: 'Inactive' },
+  ]},
+];
+
 export function LocationsPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -368,6 +441,8 @@ export function LocationsPage() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
+  const [search, setSearch] = useState('');
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) { navigate('/login'); return; }
@@ -376,22 +451,28 @@ export function LocationsPage() {
 
   const loadData = async () => {
     try {
-      const res = await endpoints.locations(1, 50);
+      const res = await endpoints.locations(1, 100);
       setRows(res.data as Location[]);
       setTotal(res.meta?.total ?? res.data.length);
     } catch { /* */ }
     setLoading(false);
   };
 
-  if (!user) return null;
-
   const formatAddress = (addr: Location['address']) => {
     if (!addr) return '--';
     return [addr.line1, addr.city, addr.state, addr.zip].filter(Boolean).join(', ') || '--';
   };
 
+  const filtered = rows.filter((r) => {
+    if (!search) return true;
+    const q = search.toLowerCase();
+    return r.name.toLowerCase().includes(q) || r.code.toLowerCase().includes(q);
+  });
+
+  if (!user) return null;
+
   return (
-    <PageShell title="Locations" count={total} onAdd={() => setShowCreate(true)}>
+    <PageShell title="Locations" count={total} onAdd={() => setShowCreate(true)} search={search} onSearch={setSearch}>
       {showCreate && <CreateLocationModal onClose={() => setShowCreate(false)} onCreated={loadData} />}
       <div className="bg-drydock-card border border-drydock-border rounded-lg overflow-hidden">
         <table className="w-full">
@@ -403,11 +484,11 @@ export function LocationsPage() {
             </tr>
           </thead>
           <tbody>
-            {loading ? <LoadingSkeleton cols={3} /> : rows.length === 0 ? (
-              <tr><td colSpan={3} className="px-5 py-8 text-center text-drydock-steel">No locations found</td></tr>
-            ) : rows.map((r) => (
-              <tr key={r.id} className="border-b border-drydock-border/50 hover:bg-drydock-bg/50 transition-colors">
-                <td className="px-5 py-3 text-sm text-drydock-text">{r.name}</td>
+            {loading ? <LoadingSkeleton cols={3} /> : filtered.length === 0 ? (
+              <tr><td colSpan={3} className="px-5 py-8 text-center text-drydock-steel">{search ? 'No locations match your search' : 'No locations found'}</td></tr>
+            ) : filtered.map((r) => (
+              <tr key={r.id} onClick={() => setSelectedId(r.id)} className="border-b border-drydock-border/50 hover:bg-drydock-bg/50 transition-colors cursor-pointer">
+                <td className="px-5 py-3 text-sm text-drydock-text font-medium">{r.name}</td>
                 <td className="px-5 py-3 text-sm font-mono text-drydock-accent">{r.code}</td>
                 <td className="px-5 py-3 text-sm text-drydock-text-dim">{formatAddress(r.address)}</td>
               </tr>
@@ -415,6 +496,8 @@ export function LocationsPage() {
           </tbody>
         </table>
       </div>
+      <RecordDrawer open={!!selectedId} onClose={() => setSelectedId(null)} entityPath="/locations"
+        recordId={selectedId} fields={LOCATION_FIELDS} title="Location" onSaved={loadData} />
     </PageShell>
   );
 }
@@ -459,6 +542,21 @@ interface Project {
   budgetAmount: number | null;
 }
 
+const PROJECT_FIELDS: FieldDef[] = [
+  { key: 'projectNumber', label: 'Project #', readOnly: true },
+  { key: 'name', label: 'Name' },
+  { key: 'status', label: 'Status', type: 'select', options: [
+    { value: 'active', label: 'Active' },
+    { value: 'on_hold', label: 'On Hold' },
+    { value: 'completed', label: 'Completed' },
+    { value: 'cancelled', label: 'Cancelled' },
+  ]},
+  { key: 'projectType', label: 'Project Type' },
+  { key: 'startDate', label: 'Start Date', type: 'date' },
+  { key: 'endDate', label: 'End Date', type: 'date' },
+  { key: 'budgetAmount', label: 'Budget (cents)', type: 'number' },
+];
+
 export function ProjectsPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -466,6 +564,8 @@ export function ProjectsPage() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
+  const [search, setSearch] = useState('');
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) { navigate('/login'); return; }
@@ -474,17 +574,23 @@ export function ProjectsPage() {
 
   const loadData = async () => {
     try {
-      const res = await endpoints.projects(1, 50);
+      const res = await endpoints.projects(1, 100);
       setRows(res.data as Project[]);
       setTotal(res.meta?.total ?? res.data.length);
     } catch { /* */ }
     setLoading(false);
   };
 
+  const filtered = rows.filter((r) => {
+    if (!search) return true;
+    const q = search.toLowerCase();
+    return r.name.toLowerCase().includes(q) || r.projectNumber.toLowerCase().includes(q) || r.status.toLowerCase().includes(q);
+  });
+
   if (!user) return null;
 
   return (
-    <PageShell title="Projects" count={total} onAdd={() => setShowCreate(true)}>
+    <PageShell title="Projects" count={total} onAdd={() => setShowCreate(true)} search={search} onSearch={setSearch}>
       {showCreate && <CreateProjectModal onClose={() => setShowCreate(false)} onCreated={loadData} />}
       <div className="bg-drydock-card border border-drydock-border rounded-lg overflow-hidden">
         <table className="w-full">
@@ -497,12 +603,12 @@ export function ProjectsPage() {
             </tr>
           </thead>
           <tbody>
-            {loading ? <LoadingSkeleton cols={4} /> : rows.length === 0 ? (
-              <tr><td colSpan={4} className="px-5 py-8 text-center text-drydock-steel">No projects found</td></tr>
-            ) : rows.map((r) => (
-              <tr key={r.id} className="border-b border-drydock-border/50 hover:bg-drydock-bg/50 transition-colors">
+            {loading ? <LoadingSkeleton cols={4} /> : filtered.length === 0 ? (
+              <tr><td colSpan={4} className="px-5 py-8 text-center text-drydock-steel">{search ? 'No projects match your search' : 'No projects found'}</td></tr>
+            ) : filtered.map((r) => (
+              <tr key={r.id} onClick={() => setSelectedId(r.id)} className="border-b border-drydock-border/50 hover:bg-drydock-bg/50 transition-colors cursor-pointer">
                 <td className="px-5 py-3 text-sm font-mono text-drydock-accent">{r.projectNumber}</td>
-                <td className="px-5 py-3 text-sm text-drydock-text">{r.name}</td>
+                <td className="px-5 py-3 text-sm text-drydock-text font-medium">{r.name}</td>
                 <td className="px-5 py-3"><StatusBadge status={r.status} /></td>
                 <td className="px-5 py-3 text-sm text-drydock-text text-right">{centsToDisplay(r.budgetAmount)}</td>
               </tr>
@@ -510,6 +616,8 @@ export function ProjectsPage() {
           </tbody>
         </table>
       </div>
+      <RecordDrawer open={!!selectedId} onClose={() => setSelectedId(null)} entityPath="/projects"
+        recordId={selectedId} fields={PROJECT_FIELDS} title="Project" onSaved={loadData} />
     </PageShell>
   );
 }

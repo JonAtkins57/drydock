@@ -1,8 +1,8 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../lib/store';
-import { endpoints } from '../lib/api';
-import Sidebar from '../components/Sidebar';
+import { useAuth } from '../../lib/store';
+import { endpoints } from '../../lib/api';
+import Sidebar from '../../components/Sidebar';
 
 interface CreditMemo {
   id: string;

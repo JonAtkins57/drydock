@@ -97,6 +97,33 @@ const SECTIONS: NavSection[] = [
     label: 'Planning',
     items: [
       { label: 'Budgets', path: '/budgets' },
+      { label: 'Cash Forecast', path: '/cash-forecast' },
+    ],
+  },
+  {
+    label: 'Project Management',
+    items: [
+      { label: 'Projects', path: '/project-management' },
+    label: 'Analytics',
+      { label: 'KPI Dashboards', path: '/kpi-dashboards' },
+    ],
+  },
+  {
+    label: 'Integrations',
+    items: [
+      { label: 'OCC Billing', path: '/occ-billing' },
+    ],
+  },
+  {
+    label: 'Project Management',
+    items: [
+      { label: 'Projects', path: '/project-management' },
+    ],
+  },
+  {
+    label: 'Analytics',
+    items: [
+      { label: 'KPI Dashboards', path: '/kpi-dashboards' },
     ],
   },
   {

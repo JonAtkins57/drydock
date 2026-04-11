@@ -21,6 +21,7 @@ import { crmRoutes } from './crm/crm.routes.js';
 import { q2cRoutes } from './q2c/q2c.routes.js';
 import { p2pRoutes } from './p2p/p2p.routes.js';
 import bamboohrRoutes from './integration/bamboohr.routes.js';
+import occRoutes from './integration/occ.routes.js';
 import apRoutes from './ap-portal/ap.routes.js';
 import attachmentRoutes from './core/attachments.routes.js';
 import { processWebhookEvent } from './q2c/docusign.service.js';
@@ -29,9 +30,19 @@ import { setupRecurringWorker } from './gl/recurring.worker.js';
 import { leaseRoutes } from './lease/lease.routes.js';
 import { assetRoutes } from './asset/asset.routes.js';
 import { workOrderRoutes } from './work-orders/work-orders.routes.js';
+import { inventoryRoutes } from './inventory/inventory.routes.js';
+import { projectMgmtRoutes } from './project-mgmt/project-mgmt.routes.js';
+=======
 import { budgetingRoutes } from './budgeting/budgeting.routes.js';
 import { forecastRoutes } from './budgeting/forecasts.routes.js';
+import { kpiRoutes } from './reports/kpi.routes.js';
+import { dashboardRoutes } from './reports/dashboards.routes.js';
 import autoCodingRoutes from './ap-portal/auto-coding.routes.js';
+import { cashForecastRoutes } from './cash-forecast/cash-forecast.routes.js';
+import { projectMgmtRoutes } from './project-mgmt/project-mgmt.routes.js';
+=======
+import autoCodingRoutes from './ap-portal/auto-coding.routes.js';
+>>>>>>> d8825ea ([shipyard/build] group 2/4: src/ap-portal/auto-coding.service.ts (NEW), src/ap-portal/auto-coding.routes.ts (NEW))
 import type { AppErrorCode } from './lib/result.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -124,6 +135,7 @@ async function buildServer() {
   await fastify.register(q2cRoutes);
   await fastify.register(p2pRoutes);
   await fastify.register(bamboohrRoutes);
+  await fastify.register(occRoutes);
   await fastify.register(apRoutes);
   await fastify.register(attachmentRoutes);
   await fastify.register(leaseRoutes, { prefix: '/api/v1/leases' });
@@ -131,7 +143,12 @@ async function buildServer() {
   await fastify.register(workOrderRoutes, { prefix: '/api/v1/work-orders' });
   await fastify.register(budgetingRoutes, { prefix: '/api/v1/budgets' });
   await fastify.register(forecastRoutes, { prefix: '/api/v1/forecasts' });
+  await fastify.register(inventoryRoutes, { prefix: '/api/v1' });
+  await fastify.register(projectMgmtRoutes, { prefix: '/api/v1/projects-mgmt' });
+  await fastify.register(kpiRoutes, { prefix: '/api/v1/kpis' });
+  await fastify.register(dashboardRoutes, { prefix: '/api/v1/dashboards' });
   await fastify.register(autoCodingRoutes);
+  await fastify.register(cashForecastRoutes, { prefix: '/api/v1/cash-forecasts' });
 
   // ── DocuSign Connect Webhook ──────────────────────────────────────
   // Encapsulated scope so the buffer content-type parser only applies here.

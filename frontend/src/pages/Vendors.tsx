@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/store';
 import { endpoints } from '../lib/api';
 import Sidebar from '../components/Sidebar';
+import RecordDrawer from '../components/RecordDrawer';
 
 interface Vendor {
   id: string;
@@ -13,12 +14,28 @@ interface Vendor {
   createdAt: string;
 }
 
+const VENDOR_FIELDS = [
+  { key: 'vendorNumber', label: 'Vendor #', readOnly: true },
+  { key: 'name', label: 'Name' },
+  { key: 'status', label: 'Status', type: 'select' as const, options: [
+    { value: 'active', label: 'Active' },
+    { value: 'inactive', label: 'Inactive' },
+    { value: 'on_hold', label: 'On Hold' },
+  ]},
+  { key: 'currency', label: 'Currency' },
+  { key: 'taxId', label: 'Tax ID' },
+  { key: 'paymentTermsId', label: 'Payment Terms ID' },
+  { key: 'createdAt', label: 'Created', readOnly: true },
+];
+
 export default function Vendors() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) { navigate('/login'); return; }
@@ -27,12 +44,18 @@ export default function Vendors() {
 
   const load = async () => {
     try {
-      const res = await endpoints.vendors(1, 50);
+      const res = await endpoints.vendors(1, 100);
       setVendors(res.data as Vendor[]);
       setTotal((res.meta as { total: number }).total);
     } catch { /* */ }
     setLoading(false);
   };
+
+  const filtered = vendors.filter((v) => {
+    if (!search) return true;
+    const q = search.toLowerCase();
+    return v.name.toLowerCase().includes(q) || v.vendorNumber.toLowerCase().includes(q);
+  });
 
   if (!user) return null;
 
@@ -44,6 +67,16 @@ export default function Vendors() {
           <div>
             <h1 className="text-2xl font-medium text-drydock-text">Vendors</h1>
             <p className="text-drydock-text-dim text-sm mt-1">{total} total</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <input
+              type="search"
+              placeholder="Search vendors…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="px-3 py-2 text-sm bg-drydock-bg border border-drydock-border rounded-md
+                text-drydock-text placeholder:text-drydock-steel focus:outline-none focus:border-drydock-accent w-52"
+            />
           </div>
         </div>
 
@@ -67,13 +100,19 @@ export default function Vendors() {
                     ))}
                   </tr>
                 ))
-              ) : vendors.length === 0 ? (
-                <tr><td colSpan={5} className="px-5 py-8 text-center text-drydock-steel">No vendors found</td></tr>
+              ) : filtered.length === 0 ? (
+                <tr><td colSpan={5} className="px-5 py-8 text-center text-drydock-steel">
+                  {search ? 'No vendors match your search' : 'No vendors found'}
+                </td></tr>
               ) : (
-                vendors.map((v) => (
-                  <tr key={v.id} className="border-b border-drydock-border/50 hover:bg-drydock-bg/50 transition-colors">
+                filtered.map((v) => (
+                  <tr
+                    key={v.id}
+                    onClick={() => setSelectedId(v.id)}
+                    className="border-b border-drydock-border/50 hover:bg-drydock-bg/50 transition-colors cursor-pointer"
+                  >
                     <td className="px-5 py-3 text-sm font-mono text-drydock-accent">{v.vendorNumber}</td>
-                    <td className="px-5 py-3 text-sm text-drydock-text">{v.name}</td>
+                    <td className="px-5 py-3 text-sm text-drydock-text font-medium">{v.name}</td>
                     <td className="px-5 py-3">
                       <span className={`text-xs px-2 py-0.5 rounded-full ${
                         v.status === 'active'
@@ -90,6 +129,16 @@ export default function Vendors() {
           </table>
         </div>
       </main>
+
+      <RecordDrawer
+        open={!!selectedId}
+        onClose={() => setSelectedId(null)}
+        entityPath="/vendors"
+        recordId={selectedId}
+        fields={VENDOR_FIELDS}
+        title="Vendor"
+        onSaved={load}
+      />
     </div>
   );
 }

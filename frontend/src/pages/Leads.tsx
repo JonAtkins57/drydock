@@ -3,6 +3,31 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/store';
 import { endpoints } from '../lib/api';
 import Sidebar from '../components/Sidebar';
+import RecordDrawer, { type FieldDef } from '../components/RecordDrawer';
+
+const LEAD_FIELDS: FieldDef[] = [
+  { key: 'name', label: 'Full Name' },
+  { key: 'email', label: 'Email', type: 'email' },
+  { key: 'phone', label: 'Phone' },
+  { key: 'company', label: 'Company' },
+  { key: 'source', label: 'Source', type: 'select', options: [
+    { value: 'website', label: 'Website' },
+    { value: 'referral', label: 'Referral' },
+    { value: 'cold_outreach', label: 'Cold Outreach' },
+    { value: 'event', label: 'Event' },
+    { value: 'partner', label: 'Partner' },
+    { value: 'other', label: 'Other' },
+  ]},
+  { key: 'status', label: 'Status', type: 'select', options: [
+    { value: 'new', label: 'New' },
+    { value: 'contacted', label: 'Contacted' },
+    { value: 'qualified', label: 'Qualified' },
+    { value: 'converted', label: 'Converted' },
+    { value: 'lost', label: 'Lost' },
+  ]},
+  { key: 'notes', label: 'Notes', type: 'textarea' },
+  { key: 'createdAt', label: 'Created', readOnly: true },
+];
 
 interface Lead {
   id: string;
@@ -189,6 +214,8 @@ export default function Leads() {
   const [showCreate, setShowCreate] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [convertLead, setConvertLead] = useState<Lead | null>(null);
+  const [search, setSearch] = useState('');
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) { navigate('/login'); return; }
@@ -220,10 +247,20 @@ export default function Leads() {
             <h1 className="text-2xl font-medium text-drydock-text">Leads</h1>
             <p className="text-drydock-text-dim text-sm mt-1">{total} total</p>
           </div>
-          <button onClick={() => setShowCreate(true)}
-            className="px-4 py-2 text-sm bg-drydock-accent hover:bg-drydock-accent-dim text-drydock-dark font-medium rounded-md transition-colors">
-            + New Lead
-          </button>
+          <div className="flex items-center gap-3">
+            <input
+              type="search"
+              placeholder="Search leads…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="px-3 py-2 text-sm bg-drydock-bg border border-drydock-border rounded-md
+                text-drydock-text placeholder:text-drydock-steel focus:outline-none focus:border-drydock-accent w-48"
+            />
+            <button onClick={() => setShowCreate(true)}
+              className="px-4 py-2 text-sm bg-drydock-accent hover:bg-drydock-accent-dim text-drydock-dark font-medium rounded-md transition-colors">
+              + New Lead
+            </button>
+          </div>
         </div>
 
         {/* Status filter tabs */}
@@ -273,14 +310,14 @@ export default function Leads() {
                     ))}
                   </tr>
                 ))
-              ) : leads.length === 0 ? (
+              ) : leads.filter((l) => !search || `${l.name} ${l.email} ${l.company ?? ''}`.toLowerCase().includes(search.toLowerCase())).length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-5 py-8 text-center text-drydock-steel">No leads found</td>
+                  <td colSpan={7} className="px-5 py-8 text-center text-drydock-steel">{search ? 'No leads match your search' : 'No leads found'}</td>
                 </tr>
               ) : (
-                leads.map((l) => (
-                  <tr key={l.id} className="border-b border-drydock-border/50 hover:bg-drydock-bg/50 transition-colors">
-                    <td className="px-5 py-3 text-sm text-drydock-text">{l.name}</td>
+                leads.filter((l) => !search || `${l.name} ${l.email} ${l.company ?? ''}`.toLowerCase().includes(search.toLowerCase())).map((l) => (
+                  <tr key={l.id} onClick={() => setSelectedId(l.id)} className="border-b border-drydock-border/50 hover:bg-drydock-bg/50 transition-colors cursor-pointer">
+                    <td className="px-5 py-3 text-sm text-drydock-text font-medium">{l.name}</td>
                     <td className="px-5 py-3 text-sm text-drydock-text-dim">{l.email}</td>
                     <td className="px-5 py-3 text-sm text-drydock-text-dim">{l.company ?? '--'}</td>
                     <td className="px-5 py-3 text-sm text-drydock-text-dim capitalize">{l.source?.replace('_', ' ')}</td>
@@ -292,7 +329,7 @@ export default function Leads() {
                     <td className="px-5 py-3 text-sm text-drydock-steel">{new Date(l.createdAt).toLocaleDateString()}</td>
                     <td className="px-5 py-3">
                       {l.status === 'qualified' && (
-                        <button onClick={() => handleConvert(l)}
+                        <button onClick={(e) => { e.stopPropagation(); handleConvert(l); }}
                           className="text-xs px-2 py-1 rounded bg-purple-900/30 text-purple-400 border border-purple-700/30 hover:bg-purple-900/50 transition-colors">
                           Convert
                         </button>
@@ -305,6 +342,9 @@ export default function Leads() {
           </table>
         </div>
       </main>
+
+      <RecordDrawer open={!!selectedId} onClose={() => setSelectedId(null)} entityPath="/leads"
+        recordId={selectedId} fields={LEAD_FIELDS} title="Lead" onSaved={loadLeads} />
     </div>
   );
 }

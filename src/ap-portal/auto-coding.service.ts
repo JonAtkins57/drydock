@@ -323,6 +323,7 @@ export async function getModelMetrics(
       acceptedCount,
       rejectedCount,
       acceptanceRate: totalFeedback > 0 ? acceptedCount / totalFeedback : 0,
+      acceptanceRate: totalSuggestions > 0 ? acceptedCount / totalSuggestions : 0,
       topAccounts: topRows.map((r) => ({
         accountId: r.account_id,
         accountName: r.account_name,

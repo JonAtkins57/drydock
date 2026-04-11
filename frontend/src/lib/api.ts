@@ -298,6 +298,17 @@ export const endpoints = {
     ),
   createAsset: (data: unknown) => api('/assets', { method: 'POST', body: data }),
 
+  // Inventory
+  warehouses: (page = 1, pageSize = 50) =>
+    api<{ data: unknown[]; meta: { total: number; page: number; pageSize: number; totalPages: number } }>(
+      `/warehouses?page=${page}&pageSize=${pageSize}`
+    ),
+  inventoryItems: (page = 1, pageSize = 50, warehouseId?: string) =>
+    api<{ data: unknown[]; meta: { total: number; page: number; pageSize: number; totalPages: number } }>(
+      `/inventory?page=${page}&pageSize=${pageSize}${warehouseId ? `&warehouseId=${warehouseId}` : ''}`
+    ),
+  createInventoryTransaction: (data: unknown) => api('/inventory/transactions', { method: 'POST', body: data }),
+
   // Work Orders
   workOrders: (page = 1, pageSize = 50) =>
     api<{ data: unknown[]; meta: { total: number; page: number; pageSize: number; totalPages: number } }>(
@@ -318,6 +329,21 @@ export const endpoints = {
   addBudgetLine: (id: string, data: unknown) => api(`/budgets/${id}/lines`, { method: 'POST', body: data }),
   getBudgetVariance: (id: string) => api(`/budgets/${id}/variance`),
 
+  // Cash Forecasts
+  cashForecastRolling: () => api<{ data: unknown[] }>('/cash-forecasts/rolling'),
+  cashForecastScenarios: (page = 1, pageSize = 50) =>
+    api<{ data: unknown[]; meta: { total: number; page: number; pageSize: number; totalPages: number } }>(
+      `/cash-forecasts?page=${page}&pageSize=${pageSize}`
+    ),
+  cashForecastScenario: (id: string) => api<unknown>(`/cash-forecasts/${id}`),
+  createCashForecastScenario: (data: unknown) => api('/cash-forecasts', { method: 'POST', body: data }),
+  bankAccounts: () => api<{ data: unknown[] }>('/cash-forecasts/bank-accounts'),
+  createBankAccount: (data: unknown) => api('/cash-forecasts/bank-accounts', { method: 'POST', body: data }),
+  bankAccountBalances: (id: string) =>
+    api<{ data: unknown[] }>(`/cash-forecasts/bank-accounts/${id}/balances`),
+  recordBankBalance: (id: string, data: unknown) =>
+    api(`/cash-forecasts/bank-accounts/${id}/balances`, { method: 'POST', body: data }),
+
   // Forecasts
   forecasts: (page = 1, pageSize = 50, params?: { fiscalYear?: number; budgetId?: string }) => {
     const qs = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
@@ -328,6 +354,30 @@ export const endpoints = {
     );
   },
   createForecast: (data: unknown) => api('/forecasts', { method: 'POST', body: data }),
+
+  // Project Management
+  projectsMgmt: (page = 1, pageSize = 50) =>
+    api<{ data: unknown[]; meta: { total: number; page: number; pageSize: number; totalPages: number } }>(
+      `/projects-mgmt?page=${page}&pageSize=${pageSize}`
+    ),
+  createProjectMgmt: (data: unknown) => api('/projects-mgmt', { method: 'POST', body: data }),
+  // KPI Dashboards
+  kpis: (from: string, to: string) =>
+    api<{ data: unknown[]; from: string; to: string }>(`/kpis?from=${from}&to=${to}`),
+  dashboards: () => api<{ data: unknown[] }>('/dashboards'),
+  createDashboard: (data: unknown) => api('/dashboards', { method: 'POST', body: data }),
+  getDashboard: (id: string) => api(`/dashboards/${id}`),
+  updateDashboard: (id: string, data: unknown) => api(`/dashboards/${id}`, { method: 'PUT', body: data }),
+  deleteDashboard: (id: string) => api(`/dashboards/${id}`, { method: 'DELETE' }),
+  // OCC Usage-Based Billing
+  occRuns: (configId: string, limit = 50) =>
+    api<{ data: unknown[]; total: number }>(`/integrations/occ/runs?configId=${encodeURIComponent(configId)}&limit=${limit}`),
+  occPullAndInvoice: (configId: string, periodStart: string, periodEnd: string) =>
+    api<{ runId: string; invoiceId: string | null }>('/integrations/occ/pull-and-invoice', {
+      method: 'POST',
+      body: { configId, periodStart, periodEnd },
+    }),
+  occRateCards: () => api<{ data: unknown[] }>('/integrations/occ/rate-cards'),
 
   // Attachments
   listAttachments: (entityType: string, entityId: string): Promise<AttachmentRow[]> => {
