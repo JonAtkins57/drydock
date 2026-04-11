@@ -14,7 +14,10 @@ export * from './asset.js';
 export * from './work-orders.js';
 export * from './budgeting.js';
 export * from './inventory.js';
+<<<<<<< HEAD
 export * from './project-mgmt.js';
 export * from './dashboards.js';
 export * from './cash-forecast.js';
 export * from './usage-billing.js';
+=======
+>>>>>>> shipyard/DD-33/dd-33-inventory-management-pha

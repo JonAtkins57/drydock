@@ -96,7 +96,11 @@ async function buildApp() {
         sub: USER_ID,
         tenantId: TENANT_ID,
         email: 'test@example.com',
+<<<<<<< HEAD
         permissions: [] as string[],
+=======
+        permissions: [],
+>>>>>>> shipyard/DD-33/dd-33-inventory-management-pha
       };
     },
   });
