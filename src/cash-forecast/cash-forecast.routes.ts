@@ -261,7 +261,7 @@ export async function cashForecastRoutes(fastify: FastifyInstance): Promise<void
     // Accumulate AR inflows
     for (const row of arRows) {
       if (!row.dueDate) continue;
-      const ws = isoWeekStart(new Date(row.dueDate as unknown as string));
+      const ws = isoWeekStart(new Date(row.dueDate as unknown as Date));
       const idx = bucketIndex.get(ws);
       if (idx !== undefined) {
         const outstanding = (row.totalAmount ?? 0) - (row.paidAmount ?? 0);
@@ -272,7 +272,7 @@ export async function cashForecastRoutes(fastify: FastifyInstance): Promise<void
     // Accumulate AP outflows
     for (const row of apRows) {
       if (!row.dueDate) continue;
-      const ws = isoWeekStart(new Date(row.dueDate as unknown as string));
+      const ws = isoWeekStart(new Date(row.dueDate as unknown as Date));
       const idx = bucketIndex.get(ws);
       if (idx !== undefined) {
         buckets[idx].apOutflowCents += row.totalAmount ?? 0;

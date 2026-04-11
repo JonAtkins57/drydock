@@ -1,4 +1,4 @@
-import { pgSchema, uuid, text, integer, boolean, date, timestamp } from 'drizzle-orm/pg-core';
+import { pgSchema, uuid, text, integer, bigint, boolean, date, timestamp } from 'drizzle-orm/pg-core';
 import { planningSchema } from './budgeting.js';
 
 // Re-export planningSchema so consumers don't need to import budgeting.ts directly
@@ -31,8 +31,8 @@ export const cashForecastLines = planningSchema.table('cash_forecast_lines', {
   tenantId: uuid('tenant_id').notNull(),
   scenarioId: uuid('scenario_id').notNull().references(() => cashForecastScenarios.id),
   weekStart: date('week_start').notNull(),
-  inflowCents: integer('inflow_cents').notNull().default(0),
-  outflowCents: integer('outflow_cents').notNull().default(0),
+  inflowCents: bigint('inflow_cents', { mode: 'number' }).notNull().default(0),
+  outflowCents: bigint('outflow_cents', { mode: 'number' }).notNull().default(0),
   notes: text('notes'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   createdBy: uuid('created_by'),
@@ -60,7 +60,7 @@ export const bankAccountBalances = planningSchema.table('bank_account_balances',
   tenantId: uuid('tenant_id').notNull(),
   bankAccountId: uuid('bank_account_id').notNull().references(() => bankAccounts.id),
   balanceDate: date('balance_date').notNull(),
-  balanceCents: integer('balance_cents').notNull(),
+  balanceCents: bigint('balance_cents', { mode: 'number' }).notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   createdBy: uuid('created_by'),
 });
