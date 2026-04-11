@@ -12,3 +12,4 @@ export * from './lease.js';
 export * from './asset.js';
 export * from './work-orders.js';
 export * from './budgeting.js';
+export * from './pricing.js';
