@@ -98,3 +98,37 @@ export const closeChecklistItems = glSchema.table('close_checklist_items', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   updatedBy: uuid('updated_by'),
 });
+
+// ── Recurring Journal Templates ────────────────────────────────────
+
+export const recurringJournalTemplates = glSchema.table('recurring_journal_templates', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  name: text('name').notNull(),
+  description: text('description'),
+  journalType: text('journal_type').notNull().default('automated'),
+  frequency: text('frequency').notNull(), // daily | weekly | monthly | quarterly | annually
+  nextRunDate: timestamp('next_run_date', { withTimezone: true }).notNull(),
+  endDate: timestamp('end_date', { withTimezone: true }),
+  status: text('status').notNull().default('active'), // active | paused | completed
+  isActive: boolean('is_active').notNull().default(true),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  createdBy: uuid('created_by'),
+  updatedBy: uuid('updated_by'),
+});
+
+export const recurringJournalTemplateLines = glSchema.table('recurring_journal_template_lines', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  templateId: uuid('template_id').notNull().references(() => recurringJournalTemplates.id),
+  lineNumber: integer('line_number').notNull(),
+  accountId: uuid('account_id').notNull().references(() => accounts.id),
+  debitAmount: bigint('debit_amount', { mode: 'number' }).notNull().default(0),
+  creditAmount: bigint('credit_amount', { mode: 'number' }).notNull().default(0),
+  description: text('description'),
+  departmentId: uuid('department_id').references(() => departments.id),
+  locationId: uuid('location_id').references(() => locations.id),
+  projectId: uuid('project_id').references(() => projects.id),
+  costCenterId: uuid('cost_center_id').references(() => costCenters.id),
+});

@@ -60,6 +60,7 @@ const SECTIONS: NavSection[] = [
       { label: 'GL Accounts', path: '/accounts' },
       { label: 'Periods', path: '/periods' },
       { label: 'Journal Entries', path: '/journal-entries' },
+      { label: 'Recurring Journals', path: '/recurring-journals' },
       { label: 'Trial Balance', path: '/trial-balance' },
     ],
   },
