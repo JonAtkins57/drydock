@@ -20,4 +20,5 @@ export * from './dashboards.js';
 export * from './cash-forecast.js';
 export * from './usage-billing.js';
 =======
->>>>>>> shipyard/DD-33/dd-33-inventory-management-pha
+export * from './pricing.js';
+>>>>>>> origin/shipyard/DD-53/dd-53-pricing-rate-cards-maste

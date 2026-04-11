@@ -378,6 +378,20 @@ export const endpoints = {
       body: { configId, periodStart, periodEnd },
     }),
   occRateCards: () => api<{ data: unknown[] }>('/integrations/occ/rate-cards'),
+  // Pricing / Rate Cards
+  rateCards: (page = 1, pageSize = 25) =>
+      `/pricing/rate-cards?page=${page}&pageSize=${pageSize}`
+  createRateCard: (data: unknown) => api('/pricing/rate-cards', { method: 'POST', body: data }),
+  getRateCard: (id: string) => api<unknown>(`/pricing/rate-cards/${id}`),
+  addRateCardTier: (id: string, data: unknown) => api(`/pricing/rate-cards/${id}/tiers`, { method: 'POST', body: data }),
+  deleteRateCard: (id: string) => api(`/pricing/rate-cards/${id}`, { method: 'DELETE' }),
+  pricingOverrides: (page = 1, pageSize = 25) =>
+      `/pricing/overrides?page=${page}&pageSize=${pageSize}`
+  createPricingOverride: (data: unknown) => api('/pricing/overrides', { method: 'POST', body: data }),
+  updatePricingOverride: (id: string, data: unknown) => api(`/pricing/overrides/${id}`, { method: 'PATCH', body: data }),
+  lookupPrice: (customerId: string, rateCardId: string, quantity: number, effectiveDate: string) =>
+    api<{ source: 'override' | 'tier'; unitPriceCents: number; currency: string }>(
+      `/pricing/rate-cards/lookup?customerId=${encodeURIComponent(customerId)}&rateCardId=${encodeURIComponent(rateCardId)}&quantity=${quantity}&effectiveDate=${encodeURIComponent(effectiveDate)}`
 
   // Attachments
   listAttachments: (entityType: string, entityId: string): Promise<AttachmentRow[]> => {

@@ -43,9 +43,10 @@ import KpiDashboards from './pages/KpiDashboards';
 import ApAutoCodingMetrics from './pages/ApAutoCodingMetrics';
 import CashForecast from './pages/CashForecast';
 import OccBilling from './pages/OccBilling';
-=======
 import { Warehouses, InventoryItemsPage, InventoryTransactionsPage } from './pages/Inventory';
->>>>>>> shipyard/DD-33/dd-33-inventory-management-pha
+=======
+import PricingRateCards from './pages/PricingRateCards';
+>>>>>>> origin/shipyard/DD-53/dd-53-pricing-rate-cards-maste
 
 export default function App() {
   const { init, token } = useAuth();
@@ -100,11 +101,12 @@ export default function App() {
       <Route path="/ap/auto-coding-metrics" element={<ApAutoCodingMetrics />} />
       <Route path="/cash-forecast" element={<CashForecast />} />
       <Route path="/occ-billing" element={<OccBilling />} />
-=======
       <Route path="/warehouses" element={<Warehouses />} />
       <Route path="/inventory-items" element={<InventoryItemsPage />} />
       <Route path="/inventory-transactions" element={<InventoryTransactionsPage />} />
->>>>>>> shipyard/DD-33/dd-33-inventory-management-pha
+=======
+      <Route path="/pricing/rate-cards" element={<PricingRateCards />} />
+>>>>>>> origin/shipyard/DD-53/dd-53-pricing-rate-cards-maste
       <Route path="/" element={token ? <Navigate to="/dashboard" /> : <Landing />} />
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>

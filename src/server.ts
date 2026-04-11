@@ -42,11 +42,11 @@ import autoCodingRoutes from './ap-portal/auto-coding.routes.js';
 import { cashForecastRoutes } from './cash-forecast/cash-forecast.routes.js';
 import { projectMgmtRoutes } from './project-mgmt/project-mgmt.routes.js';
 =======
-import autoCodingRoutes from './ap-portal/auto-coding.routes.js';
->>>>>>> d8825ea ([shipyard/build] group 2/4: src/ap-portal/auto-coding.service.ts (NEW), src/ap-portal/auto-coding.routes.ts (NEW))
-=======
 import { inventoryRoutes } from './inventory/inventory.routes.js';
 >>>>>>> shipyard/DD-33/dd-33-inventory-management-pha
+=======
+import { pricingRoutes } from './pricing/pricing.routes.js';
+>>>>>>> origin/shipyard/DD-53/dd-53-pricing-rate-cards-maste
 import type { AppErrorCode } from './lib/result.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -154,9 +154,10 @@ async function buildServer() {
   await fastify.register(dashboardRoutes, { prefix: '/api/v1/dashboards' });
   await fastify.register(autoCodingRoutes);
   await fastify.register(cashForecastRoutes, { prefix: '/api/v1/cash-forecasts' });
-=======
   await fastify.register(inventoryRoutes, { prefix: '/api/v1/inventory' });
->>>>>>> shipyard/DD-33/dd-33-inventory-management-pha
+=======
+  await fastify.register(pricingRoutes, { prefix: '/api/v1/pricing' });
+>>>>>>> origin/shipyard/DD-53/dd-53-pricing-rate-cards-maste
 
   // ── DocuSign Connect Webhook ──────────────────────────────────────
   // Encapsulated scope so the buffer content-type parser only applies here.
