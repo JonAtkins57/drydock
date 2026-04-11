@@ -99,6 +99,8 @@ export const closeChecklistItems = glSchema.table('close_checklist_items', {
   updatedBy: uuid('updated_by'),
 });
 
+// ── Recurring Journal Templates ────────────────────────────────────
+
 export const recurringJournalTemplates = glSchema.table('recurring_journal_templates', {
   id: uuid('id').defaultRandom().primaryKey(),
   tenantId: uuid('tenant_id').notNull(),
@@ -111,10 +113,12 @@ export const recurringJournalTemplates = glSchema.table('recurring_journal_templ
   autoPost: boolean('auto_post').notNull().default(false),
   createReversal: boolean('create_reversal').notNull().default(false),
   status: text('status').notNull().default('active'),
+  isActive: boolean('is_active').notNull().default(true),
   notificationEmails: jsonb('notification_emails').notNull().default([]),
   generatedCount: integer('generated_count').notNull().default(0),
   lastErrorMessage: text('last_error_message'),
   createdBy: uuid('created_by'),
+  updatedBy: uuid('updated_by'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
@@ -123,6 +127,7 @@ export const recurringJournalTemplateLines = glSchema.table('recurring_journal_t
   id: uuid('id').defaultRandom().primaryKey(),
   templateId: uuid('template_id').notNull().references(() => recurringJournalTemplates.id),
   tenantId: uuid('tenant_id').notNull(),
+  lineNumber: integer('line_number').notNull(),
   accountId: uuid('account_id').notNull().references(() => accounts.id),
   debitAmount: bigint('debit_amount', { mode: 'number' }).notNull().default(0),
   creditAmount: bigint('credit_amount', { mode: 'number' }).notNull().default(0),
