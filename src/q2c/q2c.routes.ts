@@ -6,6 +6,7 @@ import { orderService } from './orders.service.js';
 import { invoiceService } from './invoices.service.js';
 import { billingService } from './billing.service.js';
 import { creditMemoRoutes } from './credit-memos.routes.js';
+import { revRecRoutes } from './rev-rec.routes.js';
 import { db } from '../db/connection.js';
 import { contacts, quotes } from '../db/schema/index.js';
 import { sendTransactionEmail } from '../email/email-log.service.js';
@@ -590,4 +591,5 @@ export async function q2cRoutes(fastify: FastifyInstance): Promise<void> {
   await fastify.register(billingPlanRoutes, { prefix: '/api/v1/billing-plans' });
   await fastify.register(reportRoutes, { prefix: '/api/v1/reports' });
   await fastify.register(creditMemoRoutes, { prefix: '/api/v1/credit-memos' });
+  await fastify.register(revRecRoutes, { prefix: '/api/v1/rev-rec' });
 }
