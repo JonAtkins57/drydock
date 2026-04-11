@@ -27,14 +27,34 @@ export function createStubS3Client(): S3Client {
   };
 }
 
-// ── Real S3 Client Factory (placeholder) ────────────────────────────
-// Swap in @aws-sdk/client-s3 + @aws-sdk/s3-request-presigner when ready.
+// ── Real S3 Client Factory ───────────────────────────────────────────
 
-export function createS3Client(_config: {
+import {
+  S3Client as AwsS3Client,
+  PutObjectCommand,
+  GetObjectCommand,
+} from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+
+export function createS3Client(config: {
   region: string;
   accessKeyId: string;
   secretAccessKey: string;
 }): S3Client {
-  // TODO: Wire up real AWS SDK calls
-  return createStubS3Client();
+  const client = new AwsS3Client({
+    region: config.region,
+    credentials: { accessKeyId: config.accessKeyId, secretAccessKey: config.secretAccessKey },
+  });
+
+  return {
+    async upload(bucket: string, key: string, body: Buffer): Promise<string> {
+      await client.send(new PutObjectCommand({ Bucket: bucket, Key: key, Body: body }));
+      return `s3://${bucket}/${key}`;
+    },
+
+    async getSignedUrl(bucket: string, key: string): Promise<string> {
+      const command = new GetObjectCommand({ Bucket: bucket, Key: key });
+      return getSignedUrl(client, command, { expiresIn: 3600 });
+    },
+  };
 }

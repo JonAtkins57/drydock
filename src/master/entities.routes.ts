@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import { authenticateHook } from '../core/auth.middleware.js';
+import { exportItemsCsv, importItemsCsv } from './import-export.service.js';
 import {
   departmentService,
   locationService,
@@ -182,6 +183,30 @@ export async function itemRoutes(fastify: FastifyInstance): Promise<void> {
     service: itemService,
     createSchema: createItemSchema,
     updateSchema: updateItemSchema,
+  });
+
+  // GET /export — export all items as CSV
+  fastify.get('/export', async (request: FastifyRequest, reply: FastifyReply) => {
+    const { tenantId } = request.currentUser;
+    const csv = await exportItemsCsv(tenantId);
+    return reply
+      .header('Content-Type', 'text/csv')
+      .header('Content-Disposition', 'attachment; filename="items.csv"')
+      .send(csv);
+  });
+
+  // POST /import — import items from CSV (multipart)
+  fastify.post('/import', async (request: FastifyRequest, reply: FastifyReply) => {
+    const { tenantId, sub: userId } = request.currentUser;
+    const data = await request.file();
+    if (!data) {
+      return reply.status(422).send({ error: 'VALIDATION', message: 'No file uploaded' });
+    }
+    const buf = await data.toBuffer();
+    const csvText = buf.toString('utf-8');
+    const result = await importItemsCsv(tenantId, csvText, userId);
+    if (!result.ok) return sendError(reply, result.error);
+    return reply.send(result.value);
   });
 }
 

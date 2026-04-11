@@ -1,4 +1,9 @@
 import { eq, and } from 'drizzle-orm';
+import {
+  TextractClient,
+  AnalyzeExpenseCommand,
+  type ExpenseField,
+} from '@aws-sdk/client-textract';
 import { db } from '../db/connection.js';
 import { apInvoices, apInvoiceLines, ocrResults } from '../db/schema/index.js';
 import { ok, err, type Result, type AppError } from '../lib/result.js';
@@ -32,12 +37,107 @@ export interface OcrClient {
   analyzeDocument(documentUrl: string): Promise<OcrResult>;
 }
 
-// ── Stub Textract Client ────────────────────────────────────────────
+// ── Real Textract Client ────────────────────────────────────────────
+
+function getFieldValue(fields: ExpenseField[], type: string): { value: string | null; confidence: number } {
+  const field = fields.find((f) => f.Type?.Text === type);
+  return {
+    value: field?.ValueDetection?.Text ?? null,
+    confidence: (field?.ValueDetection?.Confidence ?? 0) / 100,
+  };
+}
 
 export function createTextractClient(
-  _region?: string,
-  _credentials?: { accessKeyId: string; secretAccessKey: string },
+  region?: string,
+  credentials?: { accessKeyId: string; secretAccessKey: string },
 ): OcrClient {
+  const client = new TextractClient({
+    region: region ?? process.env.AWS_REGION ?? 'us-east-1',
+    credentials: credentials ?? {
+      accessKeyId: process.env.AWS_ACCESS_KEY_ID ?? '',
+      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY ?? '',
+    },
+  });
+
+  return {
+    async analyzeDocument(documentUrl: string): Promise<OcrResult> {
+      // documentUrl is an s3:// key — extract bucket/key
+      const s3Match = documentUrl.match(/^s3:\/\/([^/]+)\/(.+)$/);
+      if (!s3Match) {
+        throw new Error(`Invalid S3 document URL: ${documentUrl}`);
+      }
+      const [, bucket, key] = s3Match as [string, string, string];
+
+      const command = new AnalyzeExpenseCommand({
+        Document: { S3Object: { Bucket: bucket, Name: key } },
+      });
+
+      const response = await client.send(command);
+      const summaryFields = response.ExpenseDocuments?.[0]?.SummaryFields ?? [];
+      const lineItemGroups = response.ExpenseDocuments?.[0]?.LineItemGroups ?? [];
+
+      const vendor = getFieldValue(summaryFields, 'VENDOR_NAME');
+      const invoiceNumber = getFieldValue(summaryFields, 'INVOICE_RECEIPT_ID');
+      const date = getFieldValue(summaryFields, 'INVOICE_RECEIPT_DATE');
+      const dueDate = getFieldValue(summaryFields, 'DUE_DATE');
+      const total = getFieldValue(summaryFields, 'TOTAL');
+      const subtotal = getFieldValue(summaryFields, 'SUBTOTAL');
+      const tax = getFieldValue(summaryFields, 'TAX');
+      const poNumber = getFieldValue(summaryFields, 'PO_NUMBER');
+      const paymentTerms = getFieldValue(summaryFields, 'PAYMENT_TERMS');
+
+      const parseAmount = (v: string | null): number | null => {
+        if (!v) return null;
+        const n = parseFloat(v.replace(/[$,]/g, ''));
+        return isNaN(n) ? null : Math.round(n * 100); // to cents
+      };
+
+      const lineItems: OcrLineItem[] = [];
+      for (const group of lineItemGroups) {
+        for (const lineItem of group.LineItems ?? []) {
+          const fields = lineItem.LineItemExpenseFields ?? [];
+          const desc = fields.find((f) => f.Type?.Text === 'ITEM')?.ValueDetection?.Text ?? '';
+          const qty = parseFloat(fields.find((f) => f.Type?.Text === 'QUANTITY')?.ValueDetection?.Text ?? '1');
+          const unitPriceRaw = fields.find((f) => f.Type?.Text === 'UNIT_PRICE')?.ValueDetection?.Text ?? '0';
+          const amountRaw = fields.find((f) => f.Type?.Text === 'PRICE')?.ValueDetection?.Text ?? '0';
+          const unitPrice = Math.round((parseFloat(unitPriceRaw.replace(/[$,]/g, '')) || 0) * 100);
+          const amount = Math.round((parseFloat(amountRaw.replace(/[$,]/g, '')) || 0) * 100);
+          lineItems.push({ description: desc, quantity: isNaN(qty) ? 1 : qty, unitPrice, amount });
+        }
+      }
+
+      return {
+        vendor: vendor.value,
+        invoiceNumber: invoiceNumber.value,
+        date: date.value,
+        dueDate: dueDate.value,
+        total: parseAmount(total.value),
+        subtotal: parseAmount(subtotal.value),
+        tax: parseAmount(tax.value),
+        poNumber: poNumber.value,
+        lineItems,
+        paymentTerms: paymentTerms.value,
+        fieldConfidences: {
+          vendor: vendor.confidence,
+          invoiceNumber: invoiceNumber.confidence,
+          date: date.confidence,
+          dueDate: dueDate.confidence,
+          total: total.confidence,
+          subtotal: subtotal.confidence,
+          tax: tax.confidence,
+          poNumber: poNumber.confidence,
+          lineItems: lineItemGroups.length > 0
+            ? (lineItemGroups[0]?.LineItems?.[0]?.LineItemExpenseFields?.[0]?.ValueDetection?.Confidence ?? 0) / 100
+            : 0,
+        },
+      };
+    },
+  };
+}
+
+// ── Stub (kept for test environments) ──────────────────────────────
+
+export function createStubTextractClient(): OcrClient {
   return {
     async analyzeDocument(_documentUrl: string): Promise<OcrResult> {
       return {
@@ -45,25 +145,18 @@ export function createTextractClient(
         invoiceNumber: 'INV-MOCK-001',
         date: '2026-01-15',
         dueDate: '2026-02-15',
-        total: 15000,
-        subtotal: 13500,
-        tax: 1500,
+        total: 1500000,
+        subtotal: 1350000,
+        tax: 150000,
         poNumber: 'PO-12345',
         lineItems: [
-          { description: 'Widget A', quantity: 10, unitPrice: 1000, amount: 10000 },
-          { description: 'Widget B', quantity: 5, unitPrice: 700, amount: 3500 },
+          { description: 'Widget A', quantity: 10, unitPrice: 100000, amount: 1000000 },
+          { description: 'Widget B', quantity: 5, unitPrice: 70000, amount: 350000 },
         ],
         paymentTerms: 'Net 30',
         fieldConfidences: {
-          vendor: 0.95,
-          invoiceNumber: 0.98,
-          date: 0.97,
-          dueDate: 0.92,
-          total: 0.99,
-          subtotal: 0.96,
-          tax: 0.94,
-          poNumber: 0.91,
-          lineItems: 0.88,
+          vendor: 0.95, invoiceNumber: 0.98, date: 0.97, dueDate: 0.92,
+          total: 0.99, subtotal: 0.96, tax: 0.94, poNumber: 0.91, lineItems: 0.88,
         },
       };
     },

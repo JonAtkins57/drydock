@@ -5,7 +5,7 @@ import {
   poLines,
   goodsReceipts,
   receiptLines,
-  emailLog,
+  poEmailLog,
   vendors,
   contacts,
 } from '../db/schema/index.js';
@@ -505,7 +505,7 @@ export async function sendPOToVendor(
   // Email confirmed sent — now commit DB atomically with the known messageId.
   await db.transaction(async (tx) => {
     await tx
-      .insert(emailLog)
+      .insert(poEmailLog)
       .values({ tenantId, poId: id, recipientEmail, sesMessageId: messageId, sentBy: userId });
 
     await tx

@@ -1,4 +1,6 @@
 import { createHash } from 'node:crypto';
+import { ImapFlow } from 'imapflow';
+import { simpleParser } from 'mailparser';
 import { checkDuplicate, createFromUpload } from './intake.service.js';
 import type { S3Client } from './s3.client.js';
 
@@ -43,11 +45,62 @@ export function createStubImapClient(): ImapClient {
   };
 }
 
-// ── Factory (real IMAP client — swap in imap-simple or similar) ─────
+// ── Real IMAP Client (imapflow + mailparser) ────────────────────────
 
-export function createImapPoller(_config: ImapConfig): ImapClient {
-  // TODO: Wire up real IMAP library
-  return createStubImapClient();
+export function createImapPoller(config: ImapConfig): ImapClient {
+  let flow: ImapFlow | null = null;
+
+  return {
+    async connect(): Promise<void> {
+      flow = new ImapFlow({
+        host: config.host,
+        port: config.port,
+        secure: config.tls,
+        auth: { user: config.user, pass: config.password },
+        logger: false,
+      });
+      await flow.connect();
+    },
+
+    async fetchUnread(): Promise<ImapMessage[]> {
+      if (!flow) throw new Error('IMAP not connected');
+      const messages: ImapMessage[] = [];
+
+      await flow.mailboxOpen('INBOX');
+
+      for await (const msg of flow.fetch({ seen: false }, { uid: true, source: true, envelope: true })) {
+        try {
+          if (!msg.source) continue;
+          const parsed = await simpleParser(msg.source as Buffer);
+          const attachments: ImapAttachment[] = (parsed.attachments ?? [])
+            .filter((a) => Buffer.isBuffer(a.content))
+            .map((a) => ({
+              filename: a.filename ?? 'attachment',
+              contentType: a.contentType,
+              content: a.content as Buffer,
+            }));
+
+          messages.push({
+            uid: String(msg.uid),
+            from: parsed.from?.text ?? '',
+            subject: parsed.subject ?? '',
+            body: typeof parsed.text === 'string' ? parsed.text : '',
+            date: parsed.date ?? new Date(),
+            attachments,
+          });
+        } catch {
+          // Skip unparseable messages
+        }
+      }
+
+      return messages;
+    },
+
+    async markRead(uid: string): Promise<void> {
+      if (!flow) throw new Error('IMAP not connected');
+      await flow.messageFlagsAdd({ uid: Number(uid) }, ['\\Seen'], { uid: true });
+    },
+  };
 }
 
 // ── Email Processing Pipeline ───────────────────────────────────────

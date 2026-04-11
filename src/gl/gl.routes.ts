@@ -11,8 +11,6 @@ import {
   listJournalEntriesQuerySchema,
   reverseJournalSchema,
   trialBalanceQuerySchema,
-  incomeStatementQuerySchema,
-  balanceSheetQuerySchema,
   createChecklistSchema,
   updateChecklistItemSchema,
   listChecklistQuerySchema,
@@ -23,11 +21,11 @@ import {
 } from './gl.schemas.js';
 import * as recurringSvc from './recurring.service.js';
 import * as accountsSvc from './accounts.service.js';
+import { exportAccountsCsv, importAccountsCsv } from '../master/import-export.service.js';
 import * as periodsSvc from './periods.service.js';
 import * as postingSvc from './posting.service.js';
 import * as checklistSvc from './close-checklist.service.js';
 import { getTrialBalance } from './trial-balance.service.js';
-import { getIncomeStatement, getBalanceSheet } from './reporting.js';
 import type { AppErrorCode } from '../lib/result.js';
 
 // ── Error response helper ──────────────────────────────────────────
@@ -153,6 +151,35 @@ const glRoutes: FastifyPluginCallback = (fastify: FastifyInstance, _opts, done) 
     }
 
     return reply.status(200).send(result.value);
+  });
+
+  // GET /api/v1/accounts/export — export chart of accounts as CSV
+  fastify.get('/api/v1/accounts/export', {
+    preHandler: [requirePermission('gl.account.read')],
+  }, async (request, reply) => {
+    const csv = await exportAccountsCsv(request.currentUser.tenantId);
+    return reply
+      .header('Content-Type', 'text/csv')
+      .header('Content-Disposition', 'attachment; filename="chart-of-accounts.csv"')
+      .send(csv);
+  });
+
+  // POST /api/v1/accounts/import — import chart of accounts from CSV (multipart)
+  fastify.post('/api/v1/accounts/import', {
+    preHandler: [requirePermission('gl.account.create')],
+  }, async (request, reply) => {
+    const { tenantId, sub: userId } = request.currentUser;
+    const data = await request.file();
+    if (!data) {
+      return reply.status(422).send(errorResponse('VALIDATION', 'No file uploaded'));
+    }
+    const buf = await data.toBuffer();
+    const csvText = buf.toString('utf-8');
+    const result = await importAccountsCsv(tenantId, csvText, userId);
+    if (!result.ok) {
+      return reply.status(500).send(errorResponse(result.error.code, result.error.message));
+    }
+    return reply.send(result.value);
   });
 
   // ════════════════════════════════════════════════════════════════
@@ -356,49 +383,6 @@ const glRoutes: FastifyPluginCallback = (fastify: FastifyInstance, _opts, done) 
     }
 
     const result = await getTrialBalance(request.currentUser.tenantId, parsed.data);
-    if (!result.ok) {
-      return reply.status(500).send(errorResponse(result.error.code, result.error.message));
-    }
-
-    return reply.status(200).send(result.value);
-  });
-
-  // GET /api/v1/reports/income-statement
-  fastify.get('/api/v1/reports/income-statement', {
-    preHandler: [requirePermission('gl.report.read')],
-  }, async (request, reply) => {
-    const parsed = incomeStatementQuerySchema.safeParse(request.query);
-    if (!parsed.success) {
-      return reply.status(400).send(errorResponse('BAD_REQUEST', 'Invalid query parameters'));
-    }
-
-    const result = await getIncomeStatement(
-      request.currentUser.tenantId,
-      parsed.data.dateFrom,
-      parsed.data.dateTo,
-      parsed.data.entityId,
-    );
-    if (!result.ok) {
-      return reply.status(500).send(errorResponse(result.error.code, result.error.message));
-    }
-
-    return reply.status(200).send(result.value);
-  });
-
-  // GET /api/v1/reports/balance-sheet
-  fastify.get('/api/v1/reports/balance-sheet', {
-    preHandler: [requirePermission('gl.report.read')],
-  }, async (request, reply) => {
-    const parsed = balanceSheetQuerySchema.safeParse(request.query);
-    if (!parsed.success) {
-      return reply.status(400).send(errorResponse('BAD_REQUEST', 'Invalid query parameters'));
-    }
-
-    const result = await getBalanceSheet(
-      request.currentUser.tenantId,
-      parsed.data.asOf,
-      parsed.data.entityId,
-    );
     if (!result.ok) {
       return reply.status(500).send(errorResponse(result.error.code, result.error.message));
     }

@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { authenticateHook } from '../core/auth.middleware.js';
 import { vendorService } from './master.service.js';
+import { exportVendorsCsv, importVendorsCsv } from './import-export.service.js';
 import {
   createVendorSchema,
   updateVendorSchema,
@@ -120,6 +121,30 @@ export async function vendorRoutes(fastify: FastifyInstance): Promise<void> {
     const result = await vendorService.listContacts(tenantId, id);
     if (!result.ok) return sendError(reply, result.error);
     return reply.send({ data: result.value });
+  });
+
+  // GET /export — export all vendors as CSV
+  fastify.get('/export', async (request: FastifyRequest, reply: FastifyReply) => {
+    const { tenantId } = request.currentUser;
+    const csv = await exportVendorsCsv(tenantId);
+    return reply
+      .header('Content-Type', 'text/csv')
+      .header('Content-Disposition', 'attachment; filename="vendors.csv"')
+      .send(csv);
+  });
+
+  // POST /import — import vendors from CSV (multipart)
+  fastify.post('/import', async (request: FastifyRequest, reply: FastifyReply) => {
+    const { tenantId, sub: userId } = request.currentUser;
+    const data = await request.file();
+    if (!data) {
+      return reply.status(422).send({ error: 'VALIDATION', message: 'No file uploaded' });
+    }
+    const buf = await data.toBuffer();
+    const csvText = buf.toString('utf-8');
+    const result = await importVendorsCsv(tenantId, csvText, userId);
+    if (!result.ok) return sendError(reply, result.error);
+    return reply.send(result.value);
   });
 
   // GET /duplicate-check — check for duplicate vendors

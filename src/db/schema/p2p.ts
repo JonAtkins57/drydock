@@ -116,7 +116,7 @@ export const receiptLines = p2pSchema.table('receipt_lines', {
 
 // ── Email Log ─────────────────────────────────────────────────
 
-export const emailLog = p2pSchema.table('email_log', {
+export const poEmailLog = p2pSchema.table('email_log', {
   id: uuid('id').defaultRandom().primaryKey(),
   tenantId: uuid('tenant_id').notNull(),
   poId: uuid('po_id').notNull().references(() => purchaseOrders.id),

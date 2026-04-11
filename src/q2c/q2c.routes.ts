@@ -7,6 +7,8 @@ import { invoiceService } from './invoices.service.js';
 import { billingService } from './billing.service.js';
 import { creditMemoRoutes } from './credit-memos.routes.js';
 import { revRecRoutes } from './rev-rec.routes.js';
+import { statementService } from './statement.service.js';
+import { generateQuotePdf, generateInvoicePdf } from './pdf.js';
 import { db } from '../db/connection.js';
 import { contacts, quotes } from '../db/schema/index.js';
 import { sendTransactionEmail } from '../email/email-log.service.js';
@@ -582,6 +584,66 @@ async function reportRoutes(fastify: FastifyInstance): Promise<void> {
   });
 }
 
+// ── PDF Routes ────────────────────────────────────────────────────
+
+async function pdfRoutes(fastify: FastifyInstance): Promise<void> {
+  fastify.addHook('onRequest', authenticateHook);
+  fastify.addHook('preHandler', setTenantContext);
+
+  // GET /quotes/:id/pdf
+  fastify.get<{ Params: { id: string } }>('/quotes/:id/pdf', async (request, reply) => {
+    const result = await generateQuotePdf(request.currentUser.tenantId, request.params.id);
+    if (!result.ok) return sendError(reply, result.error);
+    return reply
+      .header('Content-Type', 'application/pdf')
+      .header('Content-Disposition', `inline; filename="quote-${request.params.id}.pdf"`)
+      .send(result.value);
+  });
+
+  // GET /invoices/:id/pdf
+  fastify.get<{ Params: { id: string } }>('/invoices/:id/pdf', async (request, reply) => {
+    const result = await generateInvoicePdf(request.currentUser.tenantId, request.params.id);
+    if (!result.ok) return sendError(reply, result.error);
+    return reply
+      .header('Content-Type', 'application/pdf')
+      .header('Content-Disposition', `inline; filename="invoice-${request.params.id}.pdf"`)
+      .send(result.value);
+  });
+}
+
+// ── Customer Statement Routes ─────────────────────────────────────
+
+async function statementRoutes(fastify: FastifyInstance): Promise<void> {
+  fastify.addHook('onRequest', authenticateHook);
+  fastify.addHook('preHandler', setTenantContext);
+
+  // GET /:id/statement?from=YYYY-MM-DD&to=YYYY-MM-DD
+  fastify.get<{ Params: { id: string }; Querystring: { from?: string; to?: string } }>(
+    '/:id/statement',
+    async (request, reply) => {
+      const { tenantId } = request.currentUser;
+      const { id } = request.params;
+      const from = request.query.from ?? new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0]!;
+      const to = request.query.to ?? new Date().toISOString().split('T')[0]!;
+      const result = await statementService.getStatement(tenantId, id, from, to);
+      if (!result.ok) return sendError(reply, result.error);
+      return reply.send(result.value);
+    },
+  );
+
+  // POST /:id/statement/send
+  fastify.post<{ Params: { id: string }; Body: { email?: string } }>(
+    '/:id/statement/send',
+    async (request, reply) => {
+      const { tenantId } = request.currentUser;
+      const { id } = request.params;
+      const result = await statementService.sendStatement(tenantId, id, request.body?.email);
+      if (!result.ok) return sendError(reply, result.error);
+      return reply.status(200).send(result.value);
+    },
+  );
+}
+
 // ── Combined Q2C Plugin ───────────────────────────────────────────
 
 export async function q2cRoutes(fastify: FastifyInstance): Promise<void> {
@@ -592,4 +654,6 @@ export async function q2cRoutes(fastify: FastifyInstance): Promise<void> {
   await fastify.register(reportRoutes, { prefix: '/api/v1/reports' });
   await fastify.register(creditMemoRoutes, { prefix: '/api/v1/credit-memos' });
   await fastify.register(revRecRoutes, { prefix: '/api/v1/rev-rec' });
+  await fastify.register(pdfRoutes, { prefix: '/api/v1' });
+  await fastify.register(statementRoutes, { prefix: '/api/v1/customers' });
 }

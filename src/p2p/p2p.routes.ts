@@ -12,6 +12,7 @@ import {
   listGoodsReceiptsQuerySchema,
   paginationQuerySchema,
 } from './p2p.schemas.js';
+import { generatePoPdf } from '../q2c/pdf.js';
 import type { AppError } from '../lib/result.js';
 
 // ── Error response helper ──────────────────────────────────────────
@@ -259,8 +260,26 @@ export async function goodsReceiptRoutes(fastify: FastifyInstance): Promise<void
 
 // ── Combined P2P Plugin ────────────────────────────────────────────
 
+// ── PO PDF Route ──────────────────────────────────────────────────
+
+async function poPdfRoutes(fastify: FastifyInstance): Promise<void> {
+  fastify.addHook('onRequest', authenticateHook);
+  fastify.addHook('preHandler', setTenantContext);
+
+  // GET /purchase-orders/:id/pdf
+  fastify.get<{ Params: { id: string } }>('/:id/pdf', async (request, reply) => {
+    const result = await generatePoPdf(request.currentUser.tenantId, request.params.id);
+    if (!result.ok) return sendError(reply, result.error);
+    return reply
+      .header('Content-Type', 'application/pdf')
+      .header('Content-Disposition', `inline; filename="po-${request.params.id}.pdf"`)
+      .send(result.value);
+  });
+}
+
 export async function p2pRoutes(fastify: FastifyInstance): Promise<void> {
   await fastify.register(requisitionRoutes, { prefix: '/api/v1/requisitions' });
   await fastify.register(purchaseOrderRoutes, { prefix: '/api/v1/purchase-orders' });
+  await fastify.register(poPdfRoutes, { prefix: '/api/v1/purchase-orders' });
   await fastify.register(goodsReceiptRoutes, { prefix: '/api/v1/goods-receipts' });
 }

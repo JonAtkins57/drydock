@@ -2,8 +2,9 @@ import puppeteer from 'puppeteer';
 import { eq, and } from 'drizzle-orm';
 import { quoteService } from './quotes.service.js';
 import { invoiceService } from './invoices.service.js';
+import { getPO } from '../p2p/purchase-orders.service.js';
 import { db } from '../db/connection.js';
-import { customers } from '../db/schema/index.js';
+import { customers, vendors } from '../db/schema/index.js';
 import { ok, err, type Result, type AppError } from '../lib/result.js';
 
 // ── Helpers ────────────────────────────────────────────────────────
@@ -98,7 +99,7 @@ export async function generateQuotePdf(
     return ok(Buffer.from(pdfBuffer));
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
-    return err({ code: 'INTERNAL', message: 'PDF generation failed', details: { error: message } });
+    return err({ code: 'INTERNAL', message: 'Quote PDF generation failed', details: { error: message } });
   }
 }
 
@@ -168,6 +169,73 @@ export async function generateInvoicePdf(
     return ok(Buffer.from(pdfBuffer));
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
-    return err({ code: 'INTERNAL', message: 'PDF generation failed', details: { error: message } });
+    return err({ code: 'INTERNAL', message: 'Invoice PDF generation failed', details: { error: message } });
+  }
+}
+
+// ── Generate PO PDF ────────────────────────────────────────────────
+
+export async function generatePoPdf(
+  tenantId: string,
+  id: string,
+): Promise<Result<Buffer, AppError>> {
+  const poResult = await getPO(tenantId, id);
+  if (!poResult.ok) return poResult;
+  const po = poResult.value;
+
+  const vendorRows = await db
+    .select({ name: vendors.name })
+    .from(vendors)
+    .where(and(eq(vendors.id, po.vendorId), eq(vendors.tenantId, tenantId)))
+    .limit(1);
+
+  const vendorName = vendorRows[0]?.name ?? '';
+  const orderDateStr = new Date(po.orderDate).toLocaleDateString('en-US');
+  const expectedDateStr = po.expectedDelivery ? new Date(po.expectedDelivery).toLocaleDateString('en-US') : 'N/A';
+
+  const lineRows = po.lines
+    .map(
+      (l) =>
+        `<tr>
+          <td>${esc(l.description)}</td>
+          <td class="num">${l.quantity}</td>
+          <td class="num">${cents(l.unitPrice)}</td>
+          <td class="num">${cents(l.amount)}</td>
+        </tr>`,
+    )
+    .join('');
+
+  const html = `<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><style>${BASE_CSS}</style></head>
+<body>
+  <h1>Purchase Order ${esc(po.poNumber)}</h1>
+  <p class="meta"><span class="label">Vendor:</span> ${esc(vendorName)}</p>
+  <p class="meta"><span class="label">Order Date:</span> ${orderDateStr}</p>
+  <p class="meta"><span class="label">Expected Delivery:</span> ${expectedDateStr}</p>
+  ${po.notes ? `<p class="meta"><span class="label">Notes:</span> ${esc(po.notes)}</p>` : ''}
+  <table>
+    <thead>
+      <tr><th>Description</th><th style="text-align:right">Qty</th><th style="text-align:right">Unit Price</th><th style="text-align:right">Amount</th></tr>
+    </thead>
+    <tbody>${lineRows}</tbody>
+  </table>
+  <div class="totals">
+    <div class="grand">Total: ${cents(po.totalAmount)}</div>
+  </div>
+  <div class="footer">Thrasoz / DryDock Operational Platform</div>
+</body>
+</html>`;
+
+  try {
+    const browser = await puppeteer.launch({ headless: true });
+    const page = await browser.newPage();
+    await page.setContent(html, { waitUntil: 'networkidle0' });
+    const pdfBuffer = await page.pdf({ format: 'A4', printBackground: true });
+    await browser.close();
+    return ok(Buffer.from(pdfBuffer));
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    return err({ code: 'INTERNAL', message: 'PO PDF generation failed', details: { error: message } });
   }
 }

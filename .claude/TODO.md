@@ -4,15 +4,15 @@
 All 26 Harbor tickets done. All 9 CLAUDE.md Phase 1 modules built with backend + frontend + tests. ✅
 
 ## Remaining Polish / Debt
-- [ ] DocuSign integration for quote execution
-- [ ] PDF generation via Puppeteer (quotes, invoices, POs)
-- [ ] Transaction-level email send + tracking
-- [ ] Import/export utilities for master data
-- [ ] P&L and Balance Sheet financial reports
-- [ ] Credit memos with approval workflow
-- [ ] Real IMAP + Textract implementations (stubs exist)
-- [ ] Real S3 implementation (stub exists)
-- [ ] Customer statement generation
+- [ ] DocuSign integration for quote execution | P1 | added: 2026-01-15
+- [x] PDF generation via Puppeteer (quotes, invoices, POs) ✅
+- [x] Transaction-level email send + tracking ✅
+- [x] Import/export utilities for master data (customers, vendors, items, GL accounts) ✅
+- [x] P&L and Balance Sheet financial reports ✅
+- [x] Credit memos with approval workflow ✅
+- [ ] Real IMAP + Textract implementations (stubs exist) | P2 | added: 2026-01-15
+- [ ] Real S3 implementation (stub exists) | P2 | added: 2026-01-15
+- [x] Customer statement generation ✅
 
 ## P2 — Phase 2 Backlog
 - [ ] Learned auto-coding (ML on historical AP coding)
