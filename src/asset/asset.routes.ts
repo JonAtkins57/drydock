@@ -6,6 +6,7 @@ import { db } from '../db/connection.js';
 import { fixedAssets, assetDepreciationBooks, assetDisposals } from '../db/schema/index.js';
 import { generateNumber } from '../core/numbering.service.js';
 import { createJournalEntry } from '../gl/posting.service.js';
+import { logAction } from '../core/audit.service.js';
 
 // ── Schemas ────────────────────────────────────────────────────────
 
@@ -167,6 +168,15 @@ export async function assetRoutes(fastify: FastifyInstance): Promise<void> {
         createdBy: userId,
       })
       .returning();
+
+    await logAction({
+      tenantId,
+      userId,
+      action: 'create',
+      entityType: 'fixed_asset',
+      entityId: asset.id,
+      changes: { assetNumber: asset.assetNumber },
+    });
 
     return reply.status(201).send(asset);
   });
@@ -355,6 +365,24 @@ export async function assetRoutes(fastify: FastifyInstance): Promise<void> {
       .where(and(eq(fixedAssets.id, id), eq(fixedAssets.tenantId, tenantId)))
       .returning();
 
+    await logAction({
+      tenantId,
+      userId,
+      action: 'update',
+      entityType: 'fixed_asset',
+      entityId: id,
+      changes: {
+        before: {
+          name: existing.name,
+          locationId: existing.locationId,
+          departmentId: existing.departmentId,
+          usefulLifeMonths: existing.usefulLifeMonths,
+          salvageValue: existing.salvageValue,
+        },
+        after: parsed.data,
+      },
+    });
+
     return reply.send(updated);
   });
 
@@ -500,6 +528,15 @@ export async function assetRoutes(fastify: FastifyInstance): Promise<void> {
       return { bookRow, asset: updatedAsset };
     });
 
+    await logAction({
+      tenantId,
+      userId,
+      action: 'depreciate',
+      entityType: 'fixed_asset',
+      entityId: id,
+      changes: { bookType, periodDate, expense: cappedExpense },
+    });
+
     return reply.status(201).send(result);
   });
 
@@ -607,6 +644,15 @@ export async function assetRoutes(fastify: FastifyInstance): Promise<void> {
         .returning();
 
       return { disposal, asset: updatedAsset };
+    });
+
+    await logAction({
+      tenantId,
+      userId,
+      action: 'dispose',
+      entityType: 'fixed_asset',
+      entityId: id,
+      changes: { disposalType, gainLossAmount },
     });
 
     return reply.status(201).send(result);
