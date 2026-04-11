@@ -31,7 +31,6 @@ export default function ProjectManagement() {
 
   // Create form
   const [name, setName] = useState('');
-  const [projectNumber, setProjectNumber] = useState('');
   const [status, setStatus] = useState('planning');
   const [description, setDescription] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -58,13 +57,11 @@ export default function ProjectManagement() {
     try {
       await endpoints.createProjectMgmt({
         name: name.trim(),
-        projectNumber: projectNumber.trim(),
         status,
         description: description.trim() || null,
       });
       setShowCreate(false);
       setName('');
-      setProjectNumber('');
       setStatus('planning');
       setDescription('');
       load();
@@ -121,19 +118,6 @@ export default function ProjectManagement() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm text-drydock-text-dim mb-1">Project Number</label>
-                  <input
-                    type="text"
-                    value={projectNumber}
-                    onChange={(e) => setProjectNumber(e.target.value)}
-                    required
-                    className="w-full px-3 py-2 bg-drydock-bg border border-drydock-border rounded-md
-                      text-drydock-text placeholder-drydock-steel
-                      focus:outline-none focus:border-drydock-accent focus:ring-1 focus:ring-drydock-accent/30"
-                    placeholder="PROJ-001"
-                  />
-                </div>
-                <div>
                   <label className="block text-sm text-drydock-text-dim mb-1">Status</label>
                   <select
                     value={status}
@@ -173,7 +157,7 @@ export default function ProjectManagement() {
                   </button>
                   <button
                     type="submit"
-                    disabled={submitting || !name.trim() || !projectNumber.trim()}
+                    disabled={submitting || !name.trim()}
                     className="flex-1 py-2 px-4 text-sm bg-drydock-accent hover:bg-drydock-accent-dim
                       text-drydock-dark font-medium rounded-md
                       disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
