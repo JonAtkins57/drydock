@@ -1,4 +1,4 @@
-import { pgSchema, uuid, text, integer, boolean, timestamp, date } from 'drizzle-orm/pg-core';
+import { pgSchema, uuid, text, integer, bigint, boolean, timestamp, date } from 'drizzle-orm/pg-core';
 
 export const assetSchema = pgSchema('drydock_asset');
 
@@ -35,10 +35,14 @@ export const fixedAssets = assetSchema.table('fixed_assets', {
   assetClass: assetClassEnum('asset_class').notNull(),
   status: assetStatusEnum('status').notNull().default('active'),
   acquisitionDate: timestamp('acquisition_date', { withTimezone: true }).notNull(),
-  acquisitionCost: integer('acquisition_cost').notNull(),
-  salvageValue: integer('salvage_value').notNull().default(0),
+  acquisitionCost: bigint('acquisition_cost', { mode: 'number' }).notNull(),
+  salvageValue: bigint('salvage_value', { mode: 'number' }).notNull().default(0),
   usefulLifeMonths: integer('useful_life_months').notNull(),
   depreciationMethod: depreciationMethodEnum('depreciation_method').notNull(),
+  accumulatedDepreciation: bigint('accumulated_depreciation', { mode: 'number' }).notNull().default(0),
+  netBookValue: bigint('net_book_value', { mode: 'number' }).notNull(),
+  disposalDate: timestamp('disposal_date', { withTimezone: true }),
+  disposalProceeds: bigint('disposal_proceeds', { mode: 'number' }),
   locationId: uuid('location_id'),
   departmentId: uuid('department_id'),
   isActive: boolean('is_active').notNull().default(true),

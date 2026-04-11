@@ -119,6 +119,8 @@ export async function assetRoutes(fastify: FastifyInstance): Promise<void> {
         depreciationMethod,
         locationId: locationId ?? null,
         departmentId: departmentId ?? null,
+        accumulatedDepreciation: 0,
+        netBookValue: acquisitionCost,
         status: 'active',
         createdBy: userId,
       })
