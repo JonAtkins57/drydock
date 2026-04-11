@@ -281,6 +281,16 @@ export const endpoints = {
     ),
   createAsset: (data: unknown) => api('/assets', { method: 'POST', body: data }),
 
+  // Work Orders
+  workOrders: (page = 1, pageSize = 50) =>
+    api<{ data: unknown[]; meta: { total: number; page: number; pageSize: number; totalPages: number } }>(
+      `/work-orders?page=${page}&pageSize=${pageSize}`
+    ),
+  createWorkOrder: (data: unknown) => api('/work-orders', { method: 'POST', body: data }),
+  updateWorkOrder: (id: string, data: unknown) => api(`/work-orders/${id}`, { method: 'PATCH', body: data }),
+  addWorkOrderPart: (id: string, data: unknown) => api(`/work-orders/${id}/parts`, { method: 'POST', body: data }),
+  addWorkOrderTimeLog: (id: string, data: unknown) => api(`/work-orders/${id}/time-logs`, { method: 'POST', body: data }),
+
   // Attachments
   listAttachments: (entityType: string, entityId: string): Promise<AttachmentRow[]> => {
     const token = localStorage.getItem('drydock_token');
