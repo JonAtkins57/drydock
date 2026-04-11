@@ -127,6 +127,24 @@ export const amortizationScheduleLines = apSchema.table('amortization_schedule_l
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+// ── Coding Decisions (ML training data) ─────────────────────────────
+
+export const codingDecisions = apSchema.table('coding_decisions', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  vendorId: uuid('vendor_id').references(() => vendors.id),
+  description: text('description'),
+  amountCents: integer('amount_cents'),
+  accountId: uuid('account_id').notNull().references(() => accounts.id),
+  departmentId: uuid('department_id').references(() => departments.id),
+  projectId: uuid('project_id').references(() => projects.id),
+  costCenterId: uuid('cost_center_id').references(() => costCenters.id),
+  // 'manual' | 'rule' | 'ml_accepted' | 'ml_corrected'
+  source: text('source').notNull().default('manual'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  createdBy: uuid('created_by'),
+});
+
 // ── PO Match Results ─────────────────────────────────────────────────
 
 export const poMatchResults = apSchema.table('po_match_results', {
