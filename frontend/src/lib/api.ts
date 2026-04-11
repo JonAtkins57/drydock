@@ -319,17 +319,6 @@ export const endpoints = {
     );
   },
 
-  // Inventory
-  warehouses: (page = 1, pageSize = 50) =>
-    api<{ data: unknown[]; meta: { total: number; page: number; pageSize: number; totalPages: number } }>(
-      `/warehouses?page=${page}&pageSize=${pageSize}`
-    ),
-  inventoryItems: (page = 1, pageSize = 50, warehouseId?: string) =>
-    api<{ data: unknown[]; meta: { total: number; page: number; pageSize: number; totalPages: number } }>(
-      `/inventory?page=${page}&pageSize=${pageSize}${warehouseId ? `&warehouseId=${warehouseId}` : ''}`
-    ),
-  createInventoryTransaction: (data: unknown) => api('/inventory/transactions', { method: 'POST', body: data }),
-
   // Work Orders
   workOrders: (page = 1, pageSize = 50) =>
     api<{ data: unknown[]; meta: { total: number; page: number; pageSize: number; totalPages: number } }>(
@@ -399,20 +388,24 @@ export const endpoints = {
       body: { configId, periodStart, periodEnd },
     }),
   occRateCards: () => api<{ data: unknown[] }>('/integrations/occ/rate-cards'),
+  occCreateRateCard: (data: unknown) => api('/integrations/occ/rate-cards', { method: 'POST', body: data }),
+  occUpdateRateCard: (id: string, data: unknown) => api(`/integrations/occ/rate-cards/${id}`, { method: 'PATCH', body: data }),
+  occDeleteRateCard: (id: string) => api(`/integrations/occ/rate-cards/${id}`, { method: 'DELETE' }),
   // Pricing / Rate Cards
   rateCards: (page = 1, pageSize = 25) =>
-      `/pricing/rate-cards?page=${page}&pageSize=${pageSize}`
+    api<{ data: unknown[]; meta: { total: number; page: number; pageSize: number; totalPages: number } }>(`/pricing/rate-cards?page=${page}&pageSize=${pageSize}`),
   createRateCard: (data: unknown) => api('/pricing/rate-cards', { method: 'POST', body: data }),
   getRateCard: (id: string) => api<unknown>(`/pricing/rate-cards/${id}`),
   addRateCardTier: (id: string, data: unknown) => api(`/pricing/rate-cards/${id}/tiers`, { method: 'POST', body: data }),
   deleteRateCard: (id: string) => api(`/pricing/rate-cards/${id}`, { method: 'DELETE' }),
   pricingOverrides: (page = 1, pageSize = 25) =>
-      `/pricing/overrides?page=${page}&pageSize=${pageSize}`
+    api<{ data: unknown[]; meta: { total: number; page: number; pageSize: number; totalPages: number } }>(`/pricing/overrides?page=${page}&pageSize=${pageSize}`),
   createPricingOverride: (data: unknown) => api('/pricing/overrides', { method: 'POST', body: data }),
   updatePricingOverride: (id: string, data: unknown) => api(`/pricing/overrides/${id}`, { method: 'PATCH', body: data }),
   lookupPrice: (customerId: string, rateCardId: string, quantity: number, effectiveDate: string) =>
     api<{ source: 'override' | 'tier'; unitPriceCents: number; currency: string }>(
       `/pricing/rate-cards/lookup?customerId=${encodeURIComponent(customerId)}&rateCardId=${encodeURIComponent(rateCardId)}&quantity=${quantity}&effectiveDate=${encodeURIComponent(effectiveDate)}`
+    ),
 
   // Attachments
   listAttachments: (entityType: string, entityId: string): Promise<AttachmentRow[]> => {
@@ -456,6 +449,7 @@ export const endpoints = {
     api<{ data: unknown[]; meta: { total: number; page: number; pageSize: number; totalPages: number } }>(
       `/inventory/transactions?page=${page}&pageSize=${pageSize}`
     ),
+  createInventoryTransaction: (data: unknown) => api('/inventory/transactions', { method: 'POST', body: data }),
 };
 
 export interface AttachmentRow {

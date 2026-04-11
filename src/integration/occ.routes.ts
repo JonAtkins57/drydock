@@ -9,7 +9,7 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import { authenticateHook, setTenantContext } from '../core/auth.middleware.js';
-import { listRateCards, listPullRuns, pullAndInvoice } from './occ.service.js';
+import { listRateCards, listPullRuns, pullAndInvoice, createRateCard, updateRateCard, deleteRateCard } from './occ.service.js';
 import type { AppError } from '../lib/result.js';
 
 const STATUS_MAP: Record<string, number> = {
@@ -54,6 +54,72 @@ export default async function occRoutes(fastify: FastifyInstance): Promise<void>
       const result = await listRateCards(tenantId);
       if (!result.ok) return sendError(reply, result.error);
       return reply.status(200).send({ data: result.value });
+    },
+  );
+
+  // ── POST /api/v1/integrations/occ/rate-cards ────────────────────
+  const createRateCardBodySchema = z.object({
+    name: z.string().min(1),
+    meterType: z.string().min(1),
+    unitPriceCents: z.number().int().positive(),
+    currency: z.string().optional(),
+    description: z.string().optional(),
+  });
+
+  fastify.post(
+    '/api/v1/integrations/occ/rate-cards',
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const parsed = createRateCardBodySchema.safeParse(request.body);
+      if (!parsed.success) {
+        return reply.status(400).send({
+          error: 'VALIDATION',
+          message: 'Invalid request body',
+          details: parsed.error.flatten().fieldErrors,
+        });
+      }
+      const tenantId = request.currentUser.tenantId;
+      const userId = request.currentUser.sub;
+      const result = await createRateCard(tenantId, parsed.data, userId);
+      if (!result.ok) return sendError(reply, result.error);
+      return reply.status(201).send(result.value);
+    },
+  );
+
+  // ── PATCH /api/v1/integrations/occ/rate-cards/:id ───────────────
+  const updateRateCardBodySchema = z.object({
+    name: z.string().min(1).optional(),
+    unitPriceCents: z.number().int().positive().optional(),
+    currency: z.string().optional(),
+    description: z.string().optional(),
+    isActive: z.boolean().optional(),
+  });
+
+  fastify.patch(
+    '/api/v1/integrations/occ/rate-cards/:id',
+    async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+      const parsed = updateRateCardBodySchema.safeParse(request.body);
+      if (!parsed.success) {
+        return reply.status(400).send({
+          error: 'VALIDATION',
+          message: 'Invalid request body',
+          details: parsed.error.flatten().fieldErrors,
+        });
+      }
+      const tenantId = request.currentUser.tenantId;
+      const result = await updateRateCard(tenantId, request.params.id, parsed.data);
+      if (!result.ok) return sendError(reply, result.error);
+      return reply.status(200).send(result.value);
+    },
+  );
+
+  // ── DELETE /api/v1/integrations/occ/rate-cards/:id ──────────────
+  fastify.delete(
+    '/api/v1/integrations/occ/rate-cards/:id',
+    async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+      const tenantId = request.currentUser.tenantId;
+      const result = await deleteRateCard(tenantId, request.params.id);
+      if (!result.ok) return sendError(reply, result.error);
+      return reply.status(204).send();
     },
   );
 
