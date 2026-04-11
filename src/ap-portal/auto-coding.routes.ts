@@ -5,7 +5,6 @@ import { db, pool } from '../db/connection.js';
 import { apInvoiceLines, apInvoices } from '../db/schema/index.js';
 import { eq, and } from 'drizzle-orm';
 import { type AppErrorCode } from '../lib/result.js';
-import { ok as _ok, type AppErrorCode } from '../lib/result.js';
 import { normalizeDescription, getSuggestions, recordFeedback, getModelMetrics } from './auto-coding.service.js';
 
 // ── Error helpers ──────────────────────────────────────────────────

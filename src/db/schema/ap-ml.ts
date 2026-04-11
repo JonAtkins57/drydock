@@ -10,7 +10,6 @@ export const codingSuggestions = apSchema.table('coding_suggestions', {
   apInvoiceLineId: uuid('ap_invoice_line_id').notNull().references(() => apInvoiceLines.id),
   vendorId: uuid('vendor_id').notNull(),
   descriptionTokens: text('description_tokens').notNull(),
-  suggestions: jsonb('suggestions').notNull().default('[]'),
   suggestions: jsonb('suggestions').notNull().default([]),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
