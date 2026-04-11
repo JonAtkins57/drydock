@@ -3,9 +3,9 @@ import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { eq, and, desc, count } from 'drizzle-orm';
 import { authenticateHook, setTenantContext } from '../core/auth.middleware.js';
 import { db } from '../db/connection.js';
-import { creditMemos, creditMemoLines } from './credit-memos.schema.js';
-import { accountingPeriods } from '../db/schema/index.js';
+import { creditMemos, creditMemoLines, accountingPeriods } from '../db/schema/index.js';
 import { createJournalEntry } from '../gl/posting.service.js';
+import { generateNumber } from '../core/numbering.service.js';
 import type { AppError } from '../lib/result.js';
 
 // ── Error helper ───────────────────────────────────────────────────
@@ -39,10 +39,15 @@ const listQuerySchema = z.object({
 const createSchema = z.object({
   customerId: z.string().uuid(),
   invoiceId: z.string().uuid().nullish(),
-  memoNumber: z.string().min(1),
   reason: z.string().nullish(),
   totalAmount: z.number().int().min(0).default(0),
   arAccountId: z.string().uuid().nullish(),
+});
+
+const approveBodySchema = z.object({
+  periodId: z.string().uuid().nullish(),
+  debitAccountId: z.string().uuid().nullish(),
+  creditAccountId: z.string().uuid().nullish(),
 });
 
 const updateSchema = z.object({
@@ -111,7 +116,12 @@ export async function creditMemoRoutes(fastify: FastifyInstance): Promise<void> 
     }
 
     const { tenantId, sub: userId } = request.currentUser;
-    const { customerId, invoiceId, memoNumber, reason, totalAmount, arAccountId } = parsed.data;
+    const { customerId, invoiceId, reason, totalAmount, arAccountId } = parsed.data;
+
+    const numResult = await generateNumber(tenantId, 'credit_memo');
+    if (!numResult.ok) {
+      return reply.status(500).send({ error: 'INTERNAL', message: numResult.error.message });
+    }
 
     const [memo] = await db
       .insert(creditMemos)
@@ -119,7 +129,7 @@ export async function creditMemoRoutes(fastify: FastifyInstance): Promise<void> 
         tenantId,
         customerId,
         invoiceId: invoiceId ?? null,
-        memoNumber,
+        memoNumber: numResult.value,
         status: 'draft',
         reason: reason ?? null,
         totalAmount: totalAmount ?? 0,
@@ -193,7 +203,7 @@ export async function creditMemoRoutes(fastify: FastifyInstance): Promise<void> 
 
     await db
       .update(creditMemos)
-      .set({ status: 'cancelled' })
+      .set({ status: 'voided' })
       .where(and(eq(creditMemos.id, id), eq(creditMemos.tenantId, tenantId)));
 
     return reply.status(204).send();
@@ -235,6 +245,16 @@ export async function creditMemoRoutes(fastify: FastifyInstance): Promise<void> 
     const { tenantId, sub: userId } = request.currentUser;
     const { id } = request.params;
 
+    const bodyParsed = approveBodySchema.safeParse(request.body ?? {});
+    if (!bodyParsed.success) {
+      return reply.status(422).send({
+        error: 'VALIDATION',
+        message: 'Invalid request body',
+        details: bodyParsed.error.flatten().fieldErrors,
+      });
+    }
+    const { periodId: bodyPeriodId, debitAccountId, creditAccountId } = bodyParsed.data;
+
     const [memo] = await db
       .select()
       .from(creditMemos)
@@ -252,65 +272,92 @@ export async function creditMemoRoutes(fastify: FastifyInstance): Promise<void> 
       });
     }
 
-    if (!memo.arAccountId) {
-      return reply.status(422).send({
-        error: 'VALIDATION',
-        message: 'ar_account_id required for GL posting',
-      });
+    // Resolve period: use body-supplied periodId if provided, else auto-query for open period
+    let periodId: string;
+    if (bodyPeriodId) {
+      const [suppliedPeriod] = await db
+        .select()
+        .from(accountingPeriods)
+        .where(
+          and(
+            eq(accountingPeriods.id, bodyPeriodId),
+            eq(accountingPeriods.tenantId, tenantId),
+            eq(accountingPeriods.status, 'open'),
+          ),
+        )
+        .limit(1);
+      if (!suppliedPeriod) {
+        return reply.status(422).send({
+          error: 'VALIDATION',
+          message: 'Supplied period not found or not open',
+        });
+      }
+      periodId = suppliedPeriod.id;
+    } else {
+      const [openPeriod] = await db
+        .select()
+        .from(accountingPeriods)
+        .where(
+          and(
+            eq(accountingPeriods.tenantId, tenantId),
+            eq(accountingPeriods.status, 'open'),
+          ),
+        )
+        .orderBy(desc(accountingPeriods.startDate))
+        .limit(1);
+      if (!openPeriod) {
+        return reply.status(422).send({
+          error: 'VALIDATION',
+          message: 'No open accounting period',
+        });
+      }
+      periodId = openPeriod.id;
     }
 
-    // Look up current open accounting period
-    const [period] = await db
-      .select()
-      .from(accountingPeriods)
-      .where(
-        and(
-          eq(accountingPeriods.tenantId, tenantId),
-          eq(accountingPeriods.status, 'open'),
-        ),
-      )
-      .orderBy(desc(accountingPeriods.startDate))
-      .limit(1);
-
-    if (!period) {
-      return reply.status(422).send({
-        error: 'VALIDATION',
-        message: 'No open accounting period',
-      });
-    }
-
-    // Fetch lines for GL posting
-    const lines = await db
-      .select()
-      .from(creditMemoLines)
-      .where(eq(creditMemoLines.memoId, id))
-      .orderBy(creditMemoLines.lineNumber);
-
+    // Resolve debit/credit accounts: use body-supplied or fall back to memo.arAccountId + lines
     const now = new Date();
+    let glLines: { accountId: string; debitAmount: number; creditAmount: number; description?: string }[];
+
+    if (debitAccountId && creditAccountId) {
+      glLines = [
+        { accountId: debitAccountId, debitAmount: memo.totalAmount, creditAmount: 0 },
+        { accountId: creditAccountId, debitAmount: 0, creditAmount: memo.totalAmount },
+      ];
+    } else {
+      if (!memo.arAccountId) {
+        return reply.status(422).send({
+          error: 'VALIDATION',
+          message: 'debitAccountId and creditAccountId are required when ar_account_id is not set',
+        });
+      }
+      const lines = await db
+        .select()
+        .from(creditMemoLines)
+        .where(eq(creditMemoLines.memoId, id))
+        .orderBy(creditMemoLines.lineNumber);
+
+      glLines = [
+        { accountId: memo.arAccountId, debitAmount: memo.totalAmount, creditAmount: 0 },
+        ...lines.map((line) => ({
+          accountId: line.accountId,
+          debitAmount: 0,
+          creditAmount: line.amount,
+          description: line.description ?? undefined,
+        })),
+      ];
+    }
 
     const glResult = await createJournalEntry(
       tenantId,
       {
         journalType: 'automated',
-        periodId: period.id,
+        periodId,
         postingDate: now.toISOString(),
         sourceModule: 'credit_memo',
         sourceEntityType: 'credit_memo',
         sourceEntityId: memo.id,
         description: `Credit memo ${memo.memoNumber}`,
-        lines: [
-          {
-            accountId: memo.arAccountId,
-            debitAmount: memo.totalAmount,
-            creditAmount: 0,
-          },
-          ...lines.map((line) => ({
-            accountId: line.accountId,
-            debitAmount: 0,
-            creditAmount: line.amount,
-            description: line.description ?? undefined,
-          })),
-        ],
+        lines: glLines,
       },
       userId,
     );
@@ -326,10 +373,41 @@ export async function creditMemoRoutes(fastify: FastifyInstance): Promise<void> 
     const [updated] = await db
       .update(creditMemos)
       .set({
-        status: 'posted',
+        status: 'approved',
         approvedBy: userId,
-        glPostedAt: now,
+        approvedAt: now,
       })
+      .where(and(eq(creditMemos.id, id), eq(creditMemos.tenantId, tenantId)))
+      .returning();
+
+    return reply.send(updated);
+  });
+
+  // POST /:id/actions/reject — pending_approval → rejected
+  fastify.post('/:id/actions/reject', async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    const { tenantId } = request.currentUser;
+    const { id } = request.params;
+
+    const [memo] = await db
+      .select()
+      .from(creditMemos)
+      .where(and(eq(creditMemos.id, id), eq(creditMemos.tenantId, tenantId)))
+      .limit(1);
+
+    if (!memo) {
+      return reply.status(404).send({ error: 'NOT_FOUND', message: 'Credit memo not found' });
+    }
+
+    if (memo.status !== 'pending_approval') {
+      return reply.status(422).send({
+        error: 'VALIDATION',
+        message: 'Credit memo must be in pending_approval status to reject',
+      });
+    }
+
+    const [updated] = await db
+      .update(creditMemos)
+      .set({ status: 'rejected' })
       .where(and(eq(creditMemos.id, id), eq(creditMemos.tenantId, tenantId)))
       .returning();
 

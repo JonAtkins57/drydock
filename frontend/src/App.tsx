@@ -26,6 +26,7 @@ import SalesOrders from './pages/SalesOrders';
 import Invoices from './pages/Invoices';
 import BillingPlans from './pages/BillingPlans';
 import Statement from './pages/Statement';
+import CreditMemos from './pages/q2c/CreditMemos';
 import IncomeStatement from './pages/reports/IncomeStatement';
 import BalanceSheet from './pages/reports/BalanceSheet';
 
@@ -64,6 +65,7 @@ export default function App() {
       <Route path="/orders" element={<SalesOrders />} />
       <Route path="/invoices" element={<Invoices />} />
       <Route path="/billing-plans" element={<BillingPlans />} />
+      <Route path="/credit-memos" element={<CreditMemos />} />
       <Route path="/customers/:id/statement" element={<Statement />} />
       <Route path="/reports/income-statement" element={<IncomeStatement />} />
       <Route path="/reports/balance-sheet" element={<BalanceSheet />} />

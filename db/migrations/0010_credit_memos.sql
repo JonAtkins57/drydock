@@ -8,7 +8,7 @@ CREATE TABLE drydock_q2c.credit_memos (
   reason text,
   total_amount integer NOT NULL DEFAULT 0,
   ar_account_id uuid,
-  gl_posted_at timestamptz,
+  approved_at timestamptz,
   created_by uuid,
   approved_by uuid,
   created_at timestamptz NOT NULL DEFAULT now()

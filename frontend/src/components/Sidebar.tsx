@@ -26,6 +26,7 @@ const SECTIONS: NavSection[] = [
       { label: 'Sales Orders', path: '/orders' },
       { label: 'Invoices', path: '/invoices' },
       { label: 'Billing Plans', path: '/billing-plans' },
+      { label: 'Credit Memos', path: '/credit-memos' },
     ],
   },
   {
