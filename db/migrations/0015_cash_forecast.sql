@@ -56,21 +56,3 @@ CREATE INDEX idx_cash_forecast_lines_week_start ON drydock_planning.cash_forecas
 CREATE INDEX idx_bank_accounts_tenant_id ON drydock_planning.bank_accounts(tenant_id);
 CREATE INDEX idx_bank_account_balances_bank_account_id ON drydock_planning.bank_account_balances(bank_account_id);
 CREATE INDEX idx_bank_account_balances_balance_date ON drydock_planning.bank_account_balances(balance_date);
-
--- Row Level Security
-ALTER TABLE drydock_planning.cash_forecast_scenarios ENABLE ROW LEVEL SECURITY;
-ALTER TABLE drydock_planning.cash_forecast_lines ENABLE ROW LEVEL SECURITY;
-ALTER TABLE drydock_planning.bank_accounts ENABLE ROW LEVEL SECURITY;
-ALTER TABLE drydock_planning.bank_account_balances ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY tenant_isolation ON drydock_planning.cash_forecast_scenarios
-  USING (tenant_id = current_setting('app.current_tenant')::uuid);
-
-CREATE POLICY tenant_isolation ON drydock_planning.cash_forecast_lines
-  USING (tenant_id = current_setting('app.current_tenant')::uuid);
-
-CREATE POLICY tenant_isolation ON drydock_planning.bank_accounts
-  USING (tenant_id = current_setting('app.current_tenant')::uuid);
-
-CREATE POLICY tenant_isolation ON drydock_planning.bank_account_balances
-  USING (tenant_id = current_setting('app.current_tenant')::uuid);
