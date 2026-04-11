@@ -54,6 +54,7 @@ const SECTIONS: NavSection[] = [
     label: 'AP',
     items: [
       { label: 'AP Console', path: '/ap-console' },
+      { label: 'ML Coding Metrics', path: '/ap/auto-coding-metrics' },
     ],
   },
   {
