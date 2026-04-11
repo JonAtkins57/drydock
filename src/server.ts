@@ -32,21 +32,13 @@ import { assetRoutes } from './asset/asset.routes.js';
 import { workOrderRoutes } from './work-orders/work-orders.routes.js';
 import { inventoryRoutes } from './inventory/inventory.routes.js';
 import { projectMgmtRoutes } from './project-mgmt/project-mgmt.routes.js';
-=======
 import { budgetingRoutes } from './budgeting/budgeting.routes.js';
 import { forecastRoutes } from './budgeting/forecasts.routes.js';
-<<<<<<< HEAD
 import { kpiRoutes } from './reports/kpi.routes.js';
 import { dashboardRoutes } from './reports/dashboards.routes.js';
 import autoCodingRoutes from './ap-portal/auto-coding.routes.js';
 import { cashForecastRoutes } from './cash-forecast/cash-forecast.routes.js';
-import { projectMgmtRoutes } from './project-mgmt/project-mgmt.routes.js';
-=======
-import { inventoryRoutes } from './inventory/inventory.routes.js';
->>>>>>> shipyard/DD-33/dd-33-inventory-management-pha
-=======
 import { pricingRoutes } from './pricing/pricing.routes.js';
->>>>>>> origin/shipyard/DD-53/dd-53-pricing-rate-cards-maste
 import type { AppErrorCode } from './lib/result.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -147,17 +139,13 @@ async function buildServer() {
   await fastify.register(workOrderRoutes, { prefix: '/api/v1/work-orders' });
   await fastify.register(budgetingRoutes, { prefix: '/api/v1/budgets' });
   await fastify.register(forecastRoutes, { prefix: '/api/v1/forecasts' });
-<<<<<<< HEAD
-  await fastify.register(inventoryRoutes, { prefix: '/api/v1' });
+  await fastify.register(inventoryRoutes, { prefix: '/api/v1/inventory' });
   await fastify.register(projectMgmtRoutes, { prefix: '/api/v1/projects-mgmt' });
   await fastify.register(kpiRoutes, { prefix: '/api/v1/kpis' });
   await fastify.register(dashboardRoutes, { prefix: '/api/v1/dashboards' });
   await fastify.register(autoCodingRoutes);
   await fastify.register(cashForecastRoutes, { prefix: '/api/v1/cash-forecasts' });
-  await fastify.register(inventoryRoutes, { prefix: '/api/v1/inventory' });
-=======
   await fastify.register(pricingRoutes, { prefix: '/api/v1/pricing' });
->>>>>>> origin/shipyard/DD-53/dd-53-pricing-rate-cards-maste
 
   // ── DocuSign Connect Webhook ──────────────────────────────────────
   // Encapsulated scope so the buffer content-type parser only applies here.
