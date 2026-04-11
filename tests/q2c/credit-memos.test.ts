@@ -91,10 +91,14 @@ async function buildApp() {
   const app = Fastify();
   // Inject currentUser so route handlers can read it
   app.decorateRequest('currentUser', {
-    sub: USER_ID,
-    tenantId: TENANT_ID,
-    email: 'test@example.com',
-    permissions: [],
+    getter() {
+      return {
+        sub: USER_ID,
+        tenantId: TENANT_ID,
+        email: 'test@example.com',
+        permissions: [] as string[],
+      };
+    },
   });
   await app.register(creditMemoRoutes, { prefix: '/' });
   await app.ready();

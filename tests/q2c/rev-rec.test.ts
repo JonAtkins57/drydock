@@ -91,10 +91,14 @@ const DEFERRED_ACCOUNT_ID = '88888888-9999-aaaa-bbbb-cccccccccccc';
 async function buildApp() {
   const app = Fastify();
   app.decorateRequest('currentUser', {
-    sub: USER_ID,
-    tenantId: TENANT_ID,
-    email: 'test@example.com',
-    permissions: [],
+    getter() {
+      return {
+        sub: USER_ID,
+        tenantId: TENANT_ID,
+        email: 'test@example.com',
+        permissions: [] as string[],
+      };
+    },
   });
   await app.register(revRecRoutes, { prefix: '/' });
   await app.ready();
