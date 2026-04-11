@@ -16,7 +16,12 @@ import {
   createChecklistSchema,
   updateChecklistItemSchema,
   listChecklistQuerySchema,
+  createRecurringTemplateSchema,
+  createRecurringTemplateLineSchema,
+  updateRecurringTemplateSchema,
+  listRecurringTemplatesQuerySchema,
 } from './gl.schemas.js';
+import * as recurringSvc from './recurring.service.js';
 import * as accountsSvc from './accounts.service.js';
 import * as periodsSvc from './periods.service.js';
 import * as postingSvc from './posting.service.js';
@@ -483,6 +488,125 @@ const glRoutes: FastifyPluginCallback = (fastify: FastifyInstance, _opts, done) 
     async (request, reply) => {
       const { tenantId } = request.currentUser;
       const result = await checklistSvc.getChecklistSummary(tenantId, request.params.checklistId);
+      if (!result.ok) {
+        const status = errorStatus(result.error.code);
+        return reply.status(status).send(errorResponse(result.error.code, result.error.message));
+      }
+
+      return reply.status(200).send(result.value);
+    },
+  );
+
+  // ════════════════════════════════════════════════════════════════
+  // RECURRING JOURNAL TEMPLATES
+  // ════════════════════════════════════════════════════════════════
+
+  // POST /api/v1/recurring-journal-templates
+  fastify.post('/api/v1/recurring-journal-templates', {
+    preHandler: [requirePermission('gl.recurring.create')],
+  }, async (request, reply) => {
+    const parsed = createRecurringTemplateSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(400).send(errorResponse('BAD_REQUEST', 'Validation failed', {
+        errors: parsed.error.flatten().fieldErrors,
+      }));
+    }
+
+    const { tenantId, sub: userId } = request.currentUser;
+    const result = await recurringSvc.createTemplate(tenantId, parsed.data, userId);
+    if (!result.ok) {
+      const status = errorStatus(result.error.code);
+      return reply.status(status).send(errorResponse(result.error.code, result.error.message));
+    }
+
+    return reply.status(201).send(result.value);
+  });
+
+  // POST /api/v1/recurring-journal-templates/:id/lines
+  fastify.post<{ Params: { id: string } }>('/api/v1/recurring-journal-templates/:id/lines', {
+    preHandler: [requirePermission('gl.recurring.create')],
+  }, async (request, reply) => {
+    const parsed = createRecurringTemplateLineSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(400).send(errorResponse('BAD_REQUEST', 'Validation failed', {
+        errors: parsed.error.flatten().fieldErrors,
+      }));
+    }
+
+    const { tenantId } = request.currentUser;
+    const result = await recurringSvc.addTemplateLine(tenantId, request.params.id, parsed.data);
+    if (!result.ok) {
+      const status = errorStatus(result.error.code);
+      return reply.status(status).send(errorResponse(result.error.code, result.error.message));
+    }
+
+    return reply.status(201).send(result.value);
+  });
+
+  // GET /api/v1/recurring-journal-templates
+  fastify.get('/api/v1/recurring-journal-templates', {
+    preHandler: [requirePermission('gl.recurring.read')],
+  }, async (request, reply) => {
+    const parsed = listRecurringTemplatesQuerySchema.safeParse(request.query);
+    if (!parsed.success) {
+      return reply.status(400).send(errorResponse('BAD_REQUEST', 'Invalid query parameters'));
+    }
+
+    const result = await recurringSvc.listTemplates(request.currentUser.tenantId, parsed.data);
+    if (!result.ok) {
+      return reply.status(500).send(errorResponse(result.error.code, result.error.message));
+    }
+
+    return reply.status(200).send(result.value);
+  });
+
+  // GET /api/v1/recurring-journal-templates/:id
+  fastify.get<{ Params: { id: string } }>('/api/v1/recurring-journal-templates/:id', {
+    preHandler: [requirePermission('gl.recurring.read')],
+  }, async (request, reply) => {
+    const result = await recurringSvc.getTemplate(request.currentUser.tenantId, request.params.id);
+    if (!result.ok) {
+      const status = errorStatus(result.error.code);
+      return reply.status(status).send(errorResponse(result.error.code, result.error.message));
+    }
+
+    return reply.status(200).send(result.value);
+  });
+
+  // PATCH /api/v1/recurring-journal-templates/:id
+  fastify.patch<{ Params: { id: string } }>('/api/v1/recurring-journal-templates/:id', {
+    preHandler: [requirePermission('gl.recurring.update')],
+  }, async (request, reply) => {
+    const parsed = updateRecurringTemplateSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(400).send(errorResponse('BAD_REQUEST', 'Validation failed', {
+        errors: parsed.error.flatten().fieldErrors,
+      }));
+    }
+
+    const { tenantId } = request.currentUser;
+    const result = await recurringSvc.updateTemplate(tenantId, request.params.id, parsed.data);
+    if (!result.ok) {
+      const status = errorStatus(result.error.code);
+      return reply.status(status).send(errorResponse(result.error.code, result.error.message));
+    }
+
+    return reply.status(200).send(result.value);
+  });
+
+  // DELETE /api/v1/recurring-journal-templates/:id/lines/:lineId
+  fastify.delete<{ Params: { id: string; lineId: string } }>(
+    '/api/v1/recurring-journal-templates/:id/lines/:lineId',
+    {
+      preHandler: [requirePermission('gl.recurring.update')],
+    },
+    async (request, reply) => {
+      const { tenantId } = request.currentUser;
+      const result = await recurringSvc.deleteTemplateLine(
+        tenantId,
+        request.params.id,
+        request.params.lineId,
+      );
       if (!result.ok) {
         const status = errorStatus(result.error.code);
         return reply.status(status).send(errorResponse(result.error.code, result.error.message));

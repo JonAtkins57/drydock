@@ -96,8 +96,8 @@ export type UpdatePeriodStatusInput = z.infer<typeof updatePeriodStatusSchema>;
 
 export const journalEntryLineSchema = z.object({
   accountId: z.string().uuid(),
-  debitAmount: z.number().int().min(0).default(0),
-  creditAmount: z.number().int().min(0).default(0),
+  debitAmount: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER).default(0),
+  creditAmount: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER).default(0),
   description: z.string().max(500).nullish(),
   departmentId: z.string().uuid().nullish(),
   locationId: z.string().uuid().nullish(),
@@ -258,3 +258,60 @@ export interface ChecklistSummaryResult {
   items: Record<string, unknown[]>;
   outstandingCount: number;
 }
+
+// ── Recurring Journal Templates ────────────────────────────────────
+
+export const recurringFrequencyEnum = z.enum([
+  'daily',
+  'weekly',
+  'monthly',
+  'quarterly',
+  'annually',
+]);
+export type RecurringFrequency = z.infer<typeof recurringFrequencyEnum>;
+
+export const recurringTemplateStatusEnum = z.enum(['active', 'paused', 'completed', 'error']);
+export type RecurringTemplateStatus = z.infer<typeof recurringTemplateStatusEnum>;
+
+export const createRecurringTemplateSchema = z.object({
+  name: z.string().min(1).max(255),
+  description: z.string().max(1000).nullish(),
+  frequency: recurringFrequencyEnum,
+  startDate: z.string().datetime(),
+  endDate: z.string().datetime().nullish(),
+  autoPost: z.boolean().default(false),
+  createReversal: z.boolean().default(false),
+  notificationEmails: z.array(z.string().email()).default([]),
+});
+export type CreateRecurringTemplateInput = z.infer<typeof createRecurringTemplateSchema>;
+
+export const createRecurringTemplateLineSchema = z.object({
+  accountId: z.string().uuid(),
+  debitAmount: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER).default(0),
+  creditAmount: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER).default(0),
+  description: z.string().max(500).nullish(),
+  departmentId: z.string().uuid().nullish(),
+  locationId: z.string().uuid().nullish(),
+  customerId: z.string().uuid().nullish(),
+  vendorId: z.string().uuid().nullish(),
+  projectId: z.string().uuid().nullish(),
+  costCenterId: z.string().uuid().nullish(),
+  entityId: z.string().uuid().nullish(),
+  customDimensions: z.record(z.unknown()).nullish(),
+});
+export type CreateRecurringTemplateLineInput = z.infer<typeof createRecurringTemplateLineSchema>;
+
+export const updateRecurringTemplateSchema = z.object({
+  description: z.string().max(1000).nullish(),
+  notificationEmails: z.array(z.string().email()).optional(),
+  endDate: z.string().datetime().nullish(),
+  status: z.enum(['active', 'paused', 'completed']).optional(),
+});
+export type UpdateRecurringTemplateInput = z.infer<typeof updateRecurringTemplateSchema>;
+
+export const listRecurringTemplatesQuerySchema = z.object({
+  status: recurringTemplateStatusEnum.optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(500).default(50),
+});
+export type ListRecurringTemplatesQuery = z.infer<typeof listRecurringTemplatesQuerySchema>;
