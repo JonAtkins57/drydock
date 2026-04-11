@@ -1,4 +1,4 @@
-import { pgSchema, uuid, text, integer, boolean, timestamp } from 'drizzle-orm/pg-core';
+import { pgSchema, uuid, text, integer, boolean, timestamp, date } from 'drizzle-orm/pg-core';
 // Cross-schema FKs to drydock_master omitted — referenced as uuid() only per master.ts convention
 
 export const planningSchema = pgSchema('drydock_planning');
