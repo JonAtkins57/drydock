@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import { eq, desc, count, and } from 'drizzle-orm';
+import { eq, desc, count, and, gte, lte, sql } from 'drizzle-orm';
 import { authenticateHook, setTenantContext } from '../core/auth.middleware.js';
 import { db } from '../db/connection.js';
 import { fixedAssets, assetDepreciationBooks, assetDisposals } from '../db/schema/index.js';
@@ -41,6 +41,18 @@ const disposeSchema = z.object({
   gainLossAccountId: z.string().uuid().optional(),
   assetAccountId: z.string().uuid().optional(),
   accumulatedDepreciationAccountId: z.string().uuid().optional(),
+});
+
+const booksQuerySchema = z.object({
+  page: z.coerce.number().int().positive().default(1),
+  pageSize: z.coerce.number().int().positive().max(200).default(50),
+  bookType: z.enum(['tax', 'gaap', 'internal']).optional(),
+});
+
+const rollForwardQuerySchema = z.object({
+  from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'from must be YYYY-MM-DD'),
+  to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'to must be YYYY-MM-DD'),
+  bookType: z.enum(['tax', 'gaap', 'internal']).optional(),
 });
 
 const createAssetSchema = z.object({
@@ -157,6 +169,130 @@ export async function assetRoutes(fastify: FastifyInstance): Promise<void> {
       .returning();
 
     return reply.status(201).send(asset);
+  });
+
+  // GET /roll-forward — asset roll-forward report (must be before /:id)
+  fastify.get('/roll-forward', async (request: FastifyRequest, reply: FastifyReply) => {
+    const query = rollForwardQuerySchema.safeParse(request.query);
+    if (!query.success) {
+      return reply.status(422).send({
+        error: 'VALIDATION',
+        message: 'Invalid query parameters',
+        details: query.error.flatten().fieldErrors,
+      });
+    }
+
+    const { tenantId } = request.currentUser;
+    const { from, to, bookType } = query.data;
+
+    if (from > to) {
+      return reply.status(422).send({
+        error: 'VALIDATION',
+        message: 'from must be on or before to',
+      });
+    }
+
+    const bookConditions = and(
+      eq(assetDepreciationBooks.assetId, fixedAssets.id),
+      gte(assetDepreciationBooks.periodDate, from),
+      lte(assetDepreciationBooks.periodDate, to),
+      ...(bookType ? [eq(assetDepreciationBooks.bookType, bookType)] : []),
+    );
+
+    const rows = await db
+      .select({
+        assetId: fixedAssets.id,
+        assetNumber: fixedAssets.assetNumber,
+        name: fixedAssets.name,
+        assetClass: fixedAssets.assetClass,
+        status: fixedAssets.status,
+        acquisitionCost: fixedAssets.acquisitionCost,
+        accumulatedDepreciation: fixedAssets.accumulatedDepreciation,
+        netBookValue: fixedAssets.netBookValue,
+        totalDepreciationExpense: sql<number>`COALESCE(SUM(${assetDepreciationBooks.depreciationExpense}), 0)`,
+        periodCount: sql<number>`COUNT(${assetDepreciationBooks.id})`,
+        beginningNetBookValue: sql<number>`MIN(${assetDepreciationBooks.beginningBookValue})`,
+        endingNetBookValue: sql<number>`MAX(${assetDepreciationBooks.endingBookValue})`,
+      })
+      .from(fixedAssets)
+      .leftJoin(assetDepreciationBooks, bookConditions)
+      .where(eq(fixedAssets.tenantId, tenantId))
+      .groupBy(
+        fixedAssets.id,
+        fixedAssets.assetNumber,
+        fixedAssets.name,
+        fixedAssets.assetClass,
+        fixedAssets.status,
+        fixedAssets.acquisitionCost,
+        fixedAssets.accumulatedDepreciation,
+        fixedAssets.netBookValue,
+      )
+      .orderBy(fixedAssets.assetNumber);
+
+    return reply.send({
+      data: rows,
+      meta: { from, to, bookType: bookType ?? null },
+    });
+  });
+
+  // GET /:id/books — depreciation book entries for an asset
+  fastify.get('/:id/books', async (request: FastifyRequest, reply: FastifyReply) => {
+    const { id } = request.params as { id: string };
+    const { tenantId } = request.currentUser;
+
+    const query = booksQuerySchema.safeParse(request.query);
+    if (!query.success) {
+      return reply.status(422).send({
+        error: 'VALIDATION',
+        message: 'Invalid query parameters',
+        details: query.error.flatten().fieldErrors,
+      });
+    }
+
+    const [asset] = await db
+      .select({ id: fixedAssets.id })
+      .from(fixedAssets)
+      .where(and(eq(fixedAssets.id, id), eq(fixedAssets.tenantId, tenantId)))
+      .limit(1);
+
+    if (!asset) {
+      return reply.status(404).send({ error: 'NOT_FOUND', message: 'Asset not found' });
+    }
+
+    const { page, pageSize, bookType } = query.data;
+    const offset = (page - 1) * pageSize;
+
+    const conditions = and(
+      eq(assetDepreciationBooks.assetId, id),
+      eq(assetDepreciationBooks.tenantId, tenantId),
+      ...(bookType ? [eq(assetDepreciationBooks.bookType, bookType)] : []),
+    );
+
+    const [totalResult, rows] = await Promise.all([
+      db
+        .select({ value: count() })
+        .from(assetDepreciationBooks)
+        .where(conditions),
+      db
+        .select()
+        .from(assetDepreciationBooks)
+        .where(conditions)
+        .orderBy(desc(assetDepreciationBooks.periodDate))
+        .limit(pageSize)
+        .offset(offset),
+    ]);
+
+    const total = Number(totalResult[0]?.value ?? 0);
+
+    return reply.send({
+      data: rows,
+      meta: {
+        page,
+        pageSize,
+        total,
+        totalPages: Math.ceil(total / pageSize),
+      },
+    });
   });
 
   // GET /:id — single asset
