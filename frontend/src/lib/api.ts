@@ -312,6 +312,33 @@ export const endpoints = {
   },
   createForecast: (data: unknown) => api('/forecasts', { method: 'POST', body: data }),
 
+  // Pricing: Rate Cards
+  rateCards: (page = 1, pageSize = 25) =>
+    api<{ data: unknown[]; meta: { total: number; page: number; pageSize: number; totalPages: number } }>(
+      `/pricing/rate-cards?page=${page}&pageSize=${pageSize}`
+    ),
+  createRateCard: (data: unknown) => api('/pricing/rate-cards', { method: 'POST', body: data }),
+  updateRateCard: (id: string, data: unknown) => api(`/pricing/rate-cards/${id}`, { method: 'PATCH', body: data }),
+  getRateCardTiers: (rateCardId: string) => api<unknown[]>(`/pricing/rate-cards/${rateCardId}/tiers`),
+  upsertRateCardTiers: (rateCardId: string, tiers: unknown[]) =>
+    api(`/pricing/rate-cards/${rateCardId}/tiers`, { method: 'PUT', body: { tiers } }),
+  priceOverrides: (params?: { rateCardId?: string; customerId?: string }) => {
+    const qs = new URLSearchParams();
+    if (params?.rateCardId) qs.set('rateCardId', params.rateCardId);
+    if (params?.customerId) qs.set('customerId', params.customerId);
+    const q = qs.toString();
+    return api<{ data: unknown[] }>(`/pricing/overrides${q ? `?${q}` : ''}`);
+  },
+  createPriceOverride: (data: unknown) => api('/pricing/overrides', { method: 'POST', body: data }),
+  deactivatePriceOverride: (id: string) => api(`/pricing/overrides/${id}`, { method: 'DELETE' }),
+  lookupPrice: (params: { rateCardId: string; customerId?: string; quantity?: number; asOf?: string }) => {
+    const qs = new URLSearchParams({ rateCardId: params.rateCardId });
+    if (params.customerId) qs.set('customerId', params.customerId);
+    if (params.quantity !== undefined) qs.set('quantity', String(params.quantity));
+    if (params.asOf) qs.set('asOf', params.asOf);
+    return api<{ unitPriceCents: number | undefined; source: string | undefined }>(`/pricing/lookup?${qs.toString()}`);
+  },
+
   // Attachments
   listAttachments: (entityType: string, entityId: string): Promise<AttachmentRow[]> => {
     const token = localStorage.getItem('drydock_token');
