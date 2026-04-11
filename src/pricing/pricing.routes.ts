@@ -95,10 +95,14 @@ export async function pricingRoutes(fastify: FastifyInstance): Promise<void> {
 
     if (overrideRows.length > 0) {
       const override = overrideRows[0];
+      const [overrideCard] = await db
+        .select({ currency: rateCards.currency })
+        .from(rateCards)
+        .where(and(eq(rateCards.id, override.rateCardId), eq(rateCards.tenantId, tenantId)));
       return reply.send({
         source: 'override' as const,
         unitPriceCents: override.unitPriceCents,
-        currency: 'USD',
+        currency: overrideCard?.currency ?? 'USD',
       });
     }
 
