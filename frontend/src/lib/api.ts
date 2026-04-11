@@ -231,6 +231,15 @@ export const endpoints = {
       body: toEmail !== undefined ? { toEmail } : {},
     }),
 
+  // Q2C: Credit Memos
+  creditMemos: (page = 1, pageSize = 25) =>
+    api<{ data: unknown[]; meta: { total: number; page: number; pageSize: number; totalPages: number } }>(
+      `/credit-memos?page=${page}&pageSize=${pageSize}`
+    ),
+  createCreditMemo: (data: unknown) => api('/credit-memos', { method: 'POST', body: data }),
+  creditMemoAction: (id: string, action: string, body?: unknown) =>
+    api(`/credit-memos/${id}/actions/${action}`, { method: 'POST', body }),
+
   // Q2C: Billing Plans
   billingPlans: (page = 1, pageSize = 25) =>
     api<{ data: unknown[]; meta: { total: number; page: number; pageSize: number; totalPages: number } }>(
