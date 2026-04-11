@@ -244,63 +244,52 @@ export async function pullAndInvoice(
   periodEnd: string,
   createdBy: string,
 ): Promise<Result<{ runId: string; invoiceId: string | null }, AppError>> {
-  // 1. Load OCC config (outside tx — read-only, no atomicity needed)
+  // 1. Validate config before creating any records
   const configResult = await getOccConfig(tenantId, configId);
   if (!configResult.ok) return configResult;
   const { config, customerId } = configResult.value;
 
-  // 2. Fetch usage from OCC (network call — outside tx)
+  // 2. Create pull run record as 'running' before the network call
+  const [run] = await db
+    .insert(occPullRuns)
+    .values({
+      tenantId,
+      integrationConfigId: configId,
+      periodStart: new Date(periodStart),
+      periodEnd: new Date(periodEnd),
+      status: 'running',
+      createdBy,
+    })
+    .returning({ id: occPullRuns.id });
+  const runId = run.id;
+
+  // Helper: mark run as failed and surface the original error
+  const markFailed = async (message: string) => {
+    await db
+      .update(occPullRuns)
+      .set({ status: 'failed', errorMessage: message, completedAt: new Date() })
+      .where(eq(occPullRuns.id, runId));
+  };
+
+  // 3. Fetch usage from OCC API
   const usageResult = await fetchOccUsage(config, periodStart, periodEnd);
+  if (!usageResult.ok) {
+    await markFailed(usageResult.error.message);
+    return usageResult;
+  }
+  const usage = usageResult.value;
 
-  // 3. Rate the usage (pure computation — outside tx)
-  const ratingResult = usageResult.ok
-    ? await rateUsage(tenantId, usageResult.value.meters)
-    : null;
+  // 4. Rate usage against local rate cards
+  const ratingResult = await rateUsage(tenantId, usage.meters);
+  if (!ratingResult.ok) {
+    await markFailed(ratingResult.error.message);
+    return ratingResult;
+  }
+  const { lines, totalAmountCents } = ratingResult.value;
 
-  const usage = usageResult.ok ? usageResult.value : null;
-  const rating = ratingResult?.ok ? ratingResult.value : null;
-
-  // Determine final status and error before entering tx
-  const runFailed = !usageResult.ok || !ratingResult?.ok;
-  const failureMessage = !usageResult.ok
-    ? usageResult.error.message
-    : !ratingResult?.ok
-      ? ratingResult.error.message
-      : null;
-
-  // 4. All DB writes are atomic in a single transaction
+  // 5. Persist usage lines + invoice atomically
   try {
-    const result = await db.transaction(async (tx) => {
-      // Create pull run record
-      const [run] = await tx
-        .insert(occPullRuns)
-        .values({
-          tenantId,
-          integrationConfigId: configId,
-          periodStart: new Date(periodStart),
-          periodEnd: new Date(periodEnd),
-          status: runFailed ? 'failed' : 'running',
-          rawUsage: usage ?? undefined,
-          errorMessage: failureMessage,
-          completedAt: runFailed ? new Date() : undefined,
-          createdBy,
-        })
-        .returning({ id: occPullRuns.id });
-
-      const runId = run.id;
-
-      if (runFailed || !rating || !usage) {
-        return { runId, invoiceId: null };
-      }
-
-      const { lines, totalAmountCents } = rating;
-
-      // Build usage summary: meterType -> quantity
-      const usageSummary: Record<string, number> = {};
-      for (const line of lines) {
-        usageSummary[line.meterType] = line.quantity;
-      }
-
+    const invoiceId = await db.transaction(async (tx) => {
       // Insert usage lines
       if (lines.length > 0) {
         await tx.insert(occUsageLines).values(
@@ -356,32 +345,31 @@ export async function pullAndInvoice(
         }
       }
 
-      // Mark run complete with final totals
-      await tx
-        .update(occPullRuns)
-        .set({
-          status: 'complete',
-          rawUsage: usage,
-          usageSummary,
-          totalAmountCents,
-          invoiceId,
-          completedAt: new Date(),
-        })
-        .where(eq(occPullRuns.id, runId));
-
-      return { runId, invoiceId };
+      return invoiceId;
     });
 
-    // Surface the original API/rating error after recording the failed run
-    if (runFailed) {
-      const originalError = !usageResult.ok
-        ? usageResult.error
-        : (ratingResult as { ok: false; error: AppError }).error;
-      return err(originalError);
+    // Build usage summary: meterType -> quantity
+    const usageSummary: Record<string, number> = {};
+    for (const line of lines) {
+      usageSummary[line.meterType] = line.quantity;
     }
 
-    return ok(result);
+    // 6. Mark run complete with final totals
+    await db
+      .update(occPullRuns)
+      .set({
+        status: 'complete',
+        rawUsage: usage,
+        usageSummary,
+        totalAmountCents,
+        invoiceId,
+        completedAt: new Date(),
+      })
+      .where(eq(occPullRuns.id, runId));
+
+    return ok({ runId, invoiceId });
   } catch (e) {
+    await markFailed(String(e));
     return err({ code: 'INTERNAL', message: `pullAndInvoice transaction failed: ${String(e)}` });
   }
 }
