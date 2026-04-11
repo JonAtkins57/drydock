@@ -379,6 +379,27 @@ export const endpoints = {
   getDashboard: (id: string) => api(`/dashboards/${id}`),
   updateDashboard: (id: string, data: unknown) => api(`/dashboards/${id}`, { method: 'PUT', body: data }),
   deleteDashboard: (id: string) => api(`/dashboards/${id}`, { method: 'DELETE' }),
+  // JIRA Cloud Integration
+  jiraConnect: (data: { host: string; email: string; apiToken: string; configName: string }) =>
+    api<{ ok: boolean; configId: string; webhookSecret: string }>('/integrations/jira/connect', { method: 'POST', body: data }),
+  jiraTest: (configId: string) =>
+    api<{ ok: boolean; accountId: string; displayName: string }>(`/integrations/jira/test/${encodeURIComponent(configId)}`),
+  jiraSync: (configId: string, type: 'projects' | 'issues' | 'worklogs') =>
+    api<{ syncLogId: string; recordsProcessed: number; recordsFailed: number; errors: string[] }>(
+      `/integrations/jira/sync/${type}/${encodeURIComponent(configId)}`, { method: 'POST' }
+    ),
+  jiraSyncLogs: (configId: string, page = 1, pageSize = 25) =>
+    api<{ data: unknown[]; total: number }>(
+      `/integrations/jira/sync-logs/${encodeURIComponent(configId)}?page=${page}&page_size=${pageSize}`
+    ),
+  jiraStatusMappings: (configId: string) =>
+    api<{ data: unknown[] }>(`/integrations/jira/status-mappings/${encodeURIComponent(configId)}`),
+  jiraSetStatusMappings: (configId: string, mappings: Array<{ jiraStatus: string; drydockStatus: string; entityType: 'work_order' | 'project' }>) =>
+    api(`/integrations/jira/status-mappings/${encodeURIComponent(configId)}`, { method: 'PUT', body: mappings }),
+  jiraFieldMappings: (configId: string) =>
+    api<{ data: unknown[] }>(`/integrations/jira/field-mappings/${encodeURIComponent(configId)}`),
+  jiraSetFieldMappings: (configId: string, mappings: Array<{ sourceField: string; targetEntity: string; targetField: string; transformRule?: string }>) =>
+    api(`/integrations/jira/field-mappings/${encodeURIComponent(configId)}`, { method: 'PUT', body: mappings }),
   // OCC Usage-Based Billing
   occRuns: (configId: string, limit = 50) =>
     api<{ data: unknown[]; total: number }>(`/integrations/occ/runs?configId=${encodeURIComponent(configId)}&limit=${limit}`),
