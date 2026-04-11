@@ -43,6 +43,7 @@ import CashForecast from './pages/CashForecast';
 import OccBilling from './pages/OccBilling';
 import { Warehouses, InventoryItemsPage, InventoryTransactionsPage } from './pages/Inventory';
 import PricingRateCards from './pages/PricingRateCards';
+import JiraIntegration from './pages/JiraIntegration';
 
 export default function App() {
   const { init, token } = useAuth();
@@ -99,6 +100,7 @@ export default function App() {
       <Route path="/inventory-items" element={<InventoryItemsPage />} />
       <Route path="/inventory-transactions" element={<InventoryTransactionsPage />} />
       <Route path="/pricing/rate-cards" element={<PricingRateCards />} />
+      <Route path="/jira-integration" element={<JiraIntegration />} />
       <Route path="/" element={token ? <Navigate to="/dashboard" /> : <Landing />} />
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>

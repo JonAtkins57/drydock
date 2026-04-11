@@ -21,11 +21,13 @@ import { crmRoutes } from './crm/crm.routes.js';
 import { q2cRoutes } from './q2c/q2c.routes.js';
 import { p2pRoutes } from './p2p/p2p.routes.js';
 import bamboohrRoutes from './integration/bamboohr.routes.js';
+import jiraRoutes from './integration/jira.routes.js';
 import occRoutes from './integration/occ.routes.js';
 import apRoutes from './ap-portal/ap.routes.js';
 import attachmentRoutes from './core/attachments.routes.js';
 import { processWebhookEvent } from './q2c/docusign.service.js';
 import { validateDocuSignHmac } from './integration/docusign.js';
+import { loadWebhookConfig, processJiraWebhook } from './integration/jira.service.js';
 import { setupRecurringWorker } from './gl/recurring.worker.js';
 import { leaseRoutes } from './lease/lease.routes.js';
 import { assetRoutes } from './asset/asset.routes.js';
@@ -131,6 +133,7 @@ async function buildServer() {
   await fastify.register(q2cRoutes);
   await fastify.register(p2pRoutes);
   await fastify.register(bamboohrRoutes);
+  await fastify.register(jiraRoutes);
   await fastify.register(occRoutes);
   await fastify.register(apRoutes);
   await fastify.register(attachmentRoutes);
@@ -201,6 +204,76 @@ async function buildServer() {
       }
 
       return reply.status(200).send({ received: true, quoteId: result.value.quoteId, docusignStatus: result.value.docusignStatus });
+    });
+  });
+
+  // ── JIRA Cloud Webhook ────────────────────────────────────────────
+  // Encapsulated scope — raw body capture for HMAC-SHA256 validation.
+  // JIRA Cloud REST API webhooks sign payloads using 'x-hub-signature' with format
+  // 'sha256=<hex>' — the same scheme as GitHub webhooks. This is distinct from
+  // Atlassian Connect iframe apps, which use different headers (not applicable here).
+  await fastify.register(async (scope) => {
+    scope.addContentTypeParser(
+      'application/json',
+      { parseAs: 'buffer' },
+      (_req, body, done) => {
+        try {
+          done(null, { _raw: body as Buffer, parsed: JSON.parse((body as Buffer).toString('utf8')) });
+        } catch (e) {
+          done(e as Error);
+        }
+      },
+    );
+
+    scope.post('/webhooks/jira/:configId', async (request, reply) => {
+      const params = request.params as { configId?: string };
+      const configId = params.configId;
+
+      if (!configId) {
+        return reply.status(400).send({ error: 'BAD_REQUEST', message: 'Missing configId' });
+      }
+
+      const bodyWrapper = request.body as { _raw: Buffer; parsed: unknown } | null;
+      const rawBody = bodyWrapper?._raw;
+      const parsed = bodyWrapper?.parsed as Record<string, unknown> | undefined;
+
+      // Load webhook secret and validate HMAC
+      const configResult = await loadWebhookConfig(configId);
+      if (!configResult.ok) {
+        return reply.status(401).send({ error: 'UNAUTHORIZED', message: 'Unknown config' });
+      }
+
+      const webhookSecret = configResult.value.webhookSecret;
+      if (webhookSecret && rawBody) {
+        const { createHmac } = await import('node:crypto');
+        // JIRA Cloud sends signature as 'x-hub-signature' with sha256=<hex> format
+        const signatureHeader = (request.headers['x-hub-signature'] as string | undefined) ?? '';
+        const [algo, sigHex] = signatureHeader.split('=');
+        if (algo === 'sha256' && sigHex) {
+          const computed = createHmac('sha256', webhookSecret).update(rawBody).digest('hex');
+          if (computed !== sigHex) {
+            return reply.status(401).send({ error: 'UNAUTHORIZED', message: 'Invalid JIRA webhook signature' });
+          }
+        } else if (signatureHeader) {
+          // Header present but unexpected format — reject
+          return reply.status(401).send({ error: 'UNAUTHORIZED', message: 'Invalid JIRA webhook signature format' });
+        } else {
+          // No signature header at all — reject when secret is configured
+          return reply.status(401).send({ error: 'UNAUTHORIZED', message: 'Missing JIRA webhook signature' });
+        }
+      }
+
+      if (!parsed) {
+        return reply.status(400).send({ error: 'BAD_REQUEST', message: 'Missing payload' });
+      }
+
+      const result = await processJiraWebhook(configId, parsed as Parameters<typeof processJiraWebhook>[1]);
+      if (!result.ok) {
+        // Return 200 to prevent JIRA from retrying — errors go to integrationErrorQueue
+        return reply.status(200).send({ received: true, warning: result.error.message });
+      }
+
+      return reply.status(200).send({ received: true });
     });
   });
 
