@@ -19,3 +19,4 @@ export * from './dashboards.js';
 export * from './cash-forecast.js';
 export * from './usage-billing.js';
 export * from './pricing.js';
+export * from './reports.js';
