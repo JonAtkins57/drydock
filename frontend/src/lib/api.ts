@@ -301,6 +301,23 @@ export const endpoints = {
   updateAsset: (id: string, data: unknown) => api(`/assets/${id}`, { method: 'PATCH', body: data }),
   depreciateAsset: (id: string, data: unknown) => api(`/assets/${id}/actions/depreciate`, { method: 'POST', body: data }),
   disposeAsset: (id: string, data: unknown) => api(`/assets/${id}/actions/dispose`, { method: 'POST', body: data }),
+  assetBooks: (id: string, params?: { bookType?: string; page?: number; pageSize?: number }) => {
+    const qs = new URLSearchParams();
+    if (params?.bookType) qs.set('bookType', params.bookType);
+    if (params?.page) qs.set('page', String(params.page));
+    if (params?.pageSize) qs.set('pageSize', String(params.pageSize));
+    const q = qs.toString();
+    return api<{ data: unknown[]; meta: { total: number; page: number; pageSize: number; totalPages: number } }>(
+      `/assets/${id}/books${q ? '?' + q : ''}`
+    );
+  },
+  assetRollForward: (from: string, to: string, bookType?: string) => {
+    const qs = new URLSearchParams({ from, to });
+    if (bookType) qs.set('bookType', bookType);
+    return api<{ data: unknown[]; meta: { from: string; to: string; bookType: string | null } }>(
+      `/assets/roll-forward?${qs.toString()}`
+    );
+  },
 
   // Inventory
   warehouses: (page = 1, pageSize = 50) =>

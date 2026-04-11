@@ -20,6 +20,31 @@ interface FixedAsset {
   createdAt: string;
 }
 
+interface DepreciationBookEntry {
+  id: string;
+  bookType: string;
+  periodDate: string;
+  beginningBookValue: number;
+  depreciationExpense: number;
+  accumulatedDepreciation: number;
+  endingBookValue: number;
+}
+
+interface RollForwardRow {
+  assetId: string;
+  assetNumber: string;
+  name: string;
+  assetClass: string;
+  status: string;
+  acquisitionCost: number;
+  accumulatedDepreciation: number;
+  netBookValue: number;
+  totalDepreciationExpense: number;
+  periodCount: number;
+  beginningNetBookValue: number | null;
+  endingNetBookValue: number | null;
+}
+
 const STATUS_COLORS: Record<string, string> = {
   active: 'bg-green-900/30 text-green-400 border-green-700/30',
   disposed: 'bg-gray-800 text-gray-400 border-gray-700',
@@ -61,6 +86,22 @@ export default function FixedAssets() {
   const [dispProceeds, setDispProceeds] = useState('');
   const [dispSubmitting, setDispSubmitting] = useState(false);
   const [dispError, setDispError] = useState('');
+
+  // Books modal
+  const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
+  const [selectedAsset, setSelectedAsset] = useState<FixedAsset | null>(null);
+  const [books, setBooks] = useState<DepreciationBookEntry[]>([]);
+  const [booksLoading, setBooksLoading] = useState(false);
+  const [booksBookType, setBooksBookType] = useState('');
+
+  // Roll-forward modal
+  const [showRollForward, setShowRollForward] = useState(false);
+  const [rfFrom, setRfFrom] = useState('');
+  const [rfTo, setRfTo] = useState('');
+  const [rfBookType, setRfBookType] = useState('');
+  const [rfData, setRfData] = useState<RollForwardRow[]>([]);
+  const [rfLoading, setRfLoading] = useState(false);
+  const [rfError, setRfError] = useState('');
 
   useEffect(() => {
     if (!user) { navigate('/login'); return; }
@@ -145,6 +186,33 @@ export default function FixedAssets() {
     setDispSubmitting(false);
   };
 
+  const loadBooks = async (asset: FixedAsset, bookType?: string) => {
+    setSelectedAssetId(asset.id);
+    setSelectedAsset(asset);
+    setBooksLoading(true);
+    setBooks([]);
+    try {
+      const res = await endpoints.assetBooks(asset.id, bookType ? { bookType } : undefined);
+      setBooks((res as { data: DepreciationBookEntry[] }).data);
+    } catch { /* */ }
+    setBooksLoading(false);
+  };
+
+  const handleRollForward = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!rfFrom || !rfTo) return;
+    setRfLoading(true);
+    setRfError('');
+    setRfData([]);
+    try {
+      const res = await endpoints.assetRollForward(rfFrom, rfTo, rfBookType || undefined);
+      setRfData((res as { data: RollForwardRow[] }).data);
+    } catch (err) {
+      setRfError(err instanceof Error ? err.message : 'Failed to load roll-forward report');
+    }
+    setRfLoading(false);
+  };
+
   if (!user) return null;
 
   return (
@@ -156,13 +224,22 @@ export default function FixedAssets() {
             <h1 className="text-2xl font-medium text-drydock-text">Fixed Assets</h1>
             <p className="text-drydock-text-dim text-sm mt-1">{total} total</p>
           </div>
-          <button
-            onClick={() => setShowCreate(true)}
-            className="px-4 py-2 text-sm bg-drydock-accent hover:bg-drydock-accent-dim
-              text-drydock-dark font-medium rounded-md transition-colors"
-          >
-            + New Asset
-          </button>
+          <div className="flex gap-3">
+            <button
+              onClick={() => { setShowRollForward(true); setRfData([]); setRfError(''); }}
+              className="px-4 py-2 text-sm bg-drydock-card border border-drydock-border hover:border-drydock-accent
+                text-drydock-steel hover:text-drydock-text rounded-md transition-colors"
+            >
+              Roll-Forward
+            </button>
+            <button
+              onClick={() => setShowCreate(true)}
+              className="px-4 py-2 text-sm bg-drydock-accent hover:bg-drydock-accent-dim
+                text-drydock-dark font-medium rounded-md transition-colors"
+            >
+              + New Asset
+            </button>
+          </div>
         </div>
 
         {/* Create Modal */}
