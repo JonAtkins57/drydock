@@ -169,6 +169,10 @@ export async function assetRoutes(fastify: FastifyInstance): Promise<void> {
       })
       .returning();
 
+    if (!asset) {
+      return reply.status(500).send({ error: 'INTERNAL', message: 'Failed to create asset' });
+    }
+
     await logAction({
       tenantId,
       userId,
