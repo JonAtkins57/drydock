@@ -232,5 +232,17 @@ export const creditMemoLines = q2cSchema.table('credit_memo_lines', {
   lineNumber: integer('line_number').notNull(),
 });
 
+// ── Credit Memo Applications ──────────────────────────────────────
+
+export const creditMemoApplications = q2cSchema.table('credit_memo_applications', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  creditMemoId: uuid('credit_memo_id').notNull().references(() => creditMemos.id, { onDelete: 'restrict' }),
+  invoiceId: uuid('invoice_id').notNull().references(() => invoices.id, { onDelete: 'restrict' }),
+  amount: integer('amount').notNull(),
+  appliedAt: timestamp('applied_at', { withTimezone: true }).notNull().defaultNow(),
+  appliedBy: uuid('applied_by').notNull(),
+});
+
 // Revenue Recognition tables live in src/q2c/rev-rec.schema.ts (avoids circular import).
 // They are re-exported from src/db/schema/index.ts.

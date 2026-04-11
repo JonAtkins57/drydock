@@ -1,11 +1,12 @@
 import { z } from 'zod';
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import { eq, and, desc, count } from 'drizzle-orm';
+import { eq, and, desc, count, sum } from 'drizzle-orm';
 import { authenticateHook, setTenantContext } from '../core/auth.middleware.js';
 import { db } from '../db/connection.js';
-import { creditMemos, creditMemoLines, accountingPeriods } from '../db/schema/index.js';
+import { creditMemos, creditMemoLines, creditMemoApplications, accountingPeriods, invoices } from '../db/schema/index.js';
 import { createJournalEntry } from '../gl/posting.service.js';
 import { generateNumber } from '../core/numbering.service.js';
+import { logAction } from '../core/audit.service.js';
 import type { AppError } from '../lib/result.js';
 
 // ── Error helper ───────────────────────────────────────────────────
@@ -54,6 +55,11 @@ const updateSchema = z.object({
   reason: z.string().nullish(),
   totalAmount: z.number().int().min(0).optional(),
   arAccountId: z.string().uuid().nullish(),
+});
+
+const applySchema = z.object({
+  invoiceId: z.string().uuid(),
+  amount: z.number().int().positive(),
 });
 
 // ── Plugin ─────────────────────────────────────────────────────────
@@ -218,7 +224,7 @@ export async function creditMemoRoutes(fastify: FastifyInstance): Promise<void> 
 
   // POST /:id/actions/submit — draft → pending_approval
   fastify.post('/:id/actions/submit', async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
-    const { tenantId } = request.currentUser;
+    const { tenantId, sub: userId } = request.currentUser;
     const { id } = request.params;
 
     const [memo] = await db
@@ -243,6 +249,15 @@ export async function creditMemoRoutes(fastify: FastifyInstance): Promise<void> 
       .set({ status: 'pending_approval' })
       .where(and(eq(creditMemos.id, id), eq(creditMemos.tenantId, tenantId)))
       .returning();
+
+    await logAction({
+      tenantId,
+      userId,
+      action: 'submit',
+      entityType: 'credit_memo',
+      entityId: id,
+      changes: { from: 'draft', to: 'pending_approval' },
+    });
 
     return reply.send(updated);
   });
@@ -394,6 +409,15 @@ export async function creditMemoRoutes(fastify: FastifyInstance): Promise<void> 
       })
       .where(and(eq(creditMemos.id, id), eq(creditMemos.tenantId, tenantId)))
       .returning();
+
+    await logAction({
+      tenantId,
+      userId,
+      action: 'approve',
+      entityType: 'credit_memo',
+      entityId: id,
+      changes: { from: 'pending_approval', to: 'approved', journalEntryId: glResult.value.id },
+    });
 
     return reply.send(updated);
   });
