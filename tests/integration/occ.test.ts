@@ -28,6 +28,25 @@ function chainable(): Record<string, unknown> {
   return self;
 }
 
+function makeTx() {
+  return {
+    insert: () => ({
+      values: () => ({
+        returning: () => dequeue(),
+      }),
+    }),
+    select: () => ({
+      from: () => chainable(),
+    }),
+    update: () => ({
+      set: (...args: unknown[]) => {
+        mockSet(...args);
+        return chainable();
+      },
+    }),
+  };
+}
+
 vi.mock('../../src/db/connection.js', () => ({
   db: {
     insert: () => ({
@@ -45,6 +64,7 @@ vi.mock('../../src/db/connection.js', () => ({
       },
     }),
     execute: () => dequeue(),
+    transaction: async (cb: (tx: ReturnType<typeof makeTx>) => Promise<unknown>) => cb(makeTx()),
   },
   pool: { connect: vi.fn() },
 }));
