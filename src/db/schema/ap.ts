@@ -127,6 +127,26 @@ export const amortizationScheduleLines = apSchema.table('amortization_schedule_l
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+// ── Coding Training Records (Phase 2 — ML Auto-Coding) ───────────────
+
+export const codingTrainingRecords = apSchema.table('coding_training_records', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  vendorId: uuid('vendor_id').references(() => vendors.id),
+  descriptionTokens: text('description_tokens').array().notNull().default([]),
+  amountBucket: text('amount_bucket').notNull(), // xs | sm | md | lg | xl
+  glAccountId: uuid('gl_account_id').notNull().references(() => accounts.id),
+  departmentId: uuid('department_id').references(() => departments.id),
+  projectId: uuid('project_id').references(() => projects.id),
+  costCenterId: uuid('cost_center_id').references(() => costCenters.id),
+  // source of this training record
+  source: text('source').notNull().default('manual'), // manual | confirmed_rule | confirmed_suggestion
+  // feedback if this was a suggestion the user acted on
+  feedback: text('feedback'), // accepted | rejected | modified
+  apInvoiceLineId: uuid('ap_invoice_line_id').references(() => apInvoiceLines.id),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 // ── PO Match Results ─────────────────────────────────────────────────
 
 export const poMatchResults = apSchema.table('po_match_results', {
