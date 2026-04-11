@@ -89,12 +89,16 @@ const CREDIT_ACCOUNT_ID = '77777777-8888-9999-aaaa-bbbbbbbbbbbb';
 
 async function buildApp() {
   const app = Fastify();
-  // Inject currentUser so route handlers can read it
+  // Fastify 5 requires { getter } for reference-type decorators
   app.decorateRequest('currentUser', {
-    sub: USER_ID,
-    tenantId: TENANT_ID,
-    email: 'test@example.com',
-    permissions: [],
+    getter() {
+      return {
+        sub: USER_ID,
+        tenantId: TENANT_ID,
+        email: 'test@example.com',
+        permissions: [] as string[],
+      };
+    },
   });
   await app.register(creditMemoRoutes, { prefix: '/' });
   await app.ready();
