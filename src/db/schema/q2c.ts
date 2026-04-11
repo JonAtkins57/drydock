@@ -1,4 +1,4 @@
-import { pgSchema, uuid, text, integer, timestamp, jsonb } from 'drizzle-orm/pg-core';
+import { pgSchema, uuid, text, integer, bigint, timestamp, jsonb } from 'drizzle-orm/pg-core';
 
 export const q2cSchema = pgSchema('drydock_q2c');
 
@@ -231,3 +231,6 @@ export const creditMemoLines = q2cSchema.table('credit_memo_lines', {
   description: text('description'),
   lineNumber: integer('line_number').notNull(),
 });
+
+// Revenue Recognition tables live in src/q2c/rev-rec.schema.ts (avoids circular import).
+// They are re-exported from src/db/schema/index.ts.

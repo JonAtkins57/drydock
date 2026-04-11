@@ -27,6 +27,7 @@ import Invoices from './pages/Invoices';
 import BillingPlans from './pages/BillingPlans';
 import Statement from './pages/Statement';
 import CreditMemos from './pages/q2c/CreditMemos';
+import RevRec from './pages/q2c/RevRec';
 import IncomeStatement from './pages/reports/IncomeStatement';
 import BalanceSheet from './pages/reports/BalanceSheet';
 import RecurringJournals from './pages/RecurringJournals';
@@ -67,6 +68,7 @@ export default function App() {
       <Route path="/invoices" element={<Invoices />} />
       <Route path="/billing-plans" element={<BillingPlans />} />
       <Route path="/credit-memos" element={<CreditMemos />} />
+      <Route path="/rev-rec" element={<RevRec />} />
       <Route path="/customers/:id/statement" element={<Statement />} />
       <Route path="/reports/income-statement" element={<IncomeStatement />} />
       <Route path="/reports/balance-sheet" element={<BalanceSheet />} />

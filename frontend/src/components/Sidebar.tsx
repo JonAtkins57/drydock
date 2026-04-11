@@ -27,6 +27,7 @@ const SECTIONS: NavSection[] = [
       { label: 'Invoices', path: '/invoices' },
       { label: 'Billing Plans', path: '/billing-plans' },
       { label: 'Credit Memos', path: '/credit-memos' },
+      { label: 'Revenue Recognition', path: '/rev-rec' },
     ],
   },
   {

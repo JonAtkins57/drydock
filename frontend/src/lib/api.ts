@@ -244,6 +244,22 @@ export const endpoints = {
   creditMemoAction: (id: string, action: string, body?: unknown) =>
     api(`/credit-memos/${id}/actions/${action}`, { method: 'POST', body }),
 
+  // Q2C: Revenue Recognition
+  revRecContracts: (page = 1, pageSize = 25) =>
+    api<{ data: unknown[]; meta: { total: number; page: number; pageSize: number; totalPages: number } }>(
+      `/rev-rec/contracts?page=${page}&pageSize=${pageSize}`
+    ),
+  revRecObligations: (page = 1, pageSize = 25, contractId?: string) =>
+    api<{ data: unknown[]; meta: { total: number; page: number; pageSize: number; totalPages: number } }>(
+      `/rev-rec/obligations?page=${page}&pageSize=${pageSize}${contractId ? `&contractId=${contractId}` : ''}`
+    ),
+  revRecSchedules: (page = 1, pageSize = 25, obligationId?: string) =>
+    api<{ data: unknown[]; meta: { total: number; page: number; pageSize: number; totalPages: number } }>(
+      `/rev-rec/schedules?page=${page}&pageSize=${pageSize}${obligationId ? `&obligationId=${obligationId}` : ''}`
+    ),
+  recognizeRevenue: (contractId: string, body: unknown) =>
+    api(`/rev-rec/contracts/${contractId}/recognize`, { method: 'POST', body }),
+
   // Q2C: Billing Plans
   billingPlans: (page = 1, pageSize = 25) =>
     api<{ data: unknown[]; meta: { total: number; page: number; pageSize: number; totalPages: number } }>(
