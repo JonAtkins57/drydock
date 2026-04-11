@@ -81,6 +81,12 @@ const SECTIONS: NavSection[] = [
     ],
   },
   {
+    label: 'Fixed Assets',
+    items: [
+      { label: 'Fixed Assets', path: '/assets' },
+    ],
+  },
+  {
     label: 'Settings',
     items: [
       { label: 'Custom Fields', path: '/custom-fields' },

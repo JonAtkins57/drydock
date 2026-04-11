@@ -274,6 +274,13 @@ export const endpoints = {
     ),
   createLease: (data: unknown) => api('/leases', { method: 'POST', body: data }),
 
+  // Fixed Assets
+  assets: (page = 1, pageSize = 50) =>
+    api<{ data: unknown[]; meta: { total: number; page: number; pageSize: number; totalPages: number } }>(
+      `/assets?page=${page}&pageSize=${pageSize}`
+    ),
+  createAsset: (data: unknown) => api('/assets', { method: 'POST', body: data }),
+
   // Attachments
   listAttachments: (entityType: string, entityId: string): Promise<AttachmentRow[]> => {
     const token = localStorage.getItem('drydock_token');

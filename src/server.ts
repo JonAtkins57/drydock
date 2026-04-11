@@ -27,6 +27,7 @@ import { processWebhookEvent } from './q2c/docusign.service.js';
 import { validateDocuSignHmac } from './integration/docusign.js';
 import { setupRecurringWorker } from './gl/recurring.worker.js';
 import { leaseRoutes } from './lease/lease.routes.js';
+import { assetRoutes } from './asset/asset.routes.js';
 import type { AppErrorCode } from './lib/result.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -122,6 +123,7 @@ async function buildServer() {
   await fastify.register(apRoutes);
   await fastify.register(attachmentRoutes);
   await fastify.register(leaseRoutes, { prefix: '/api/v1/leases' });
+  await fastify.register(assetRoutes, { prefix: '/api/v1/assets' });
 
   // ── DocuSign Connect Webhook ──────────────────────────────────────
   // Encapsulated scope so the buffer content-type parser only applies here.
