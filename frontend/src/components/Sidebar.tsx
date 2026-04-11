@@ -93,6 +93,14 @@ const SECTIONS: NavSection[] = [
     ],
   },
   {
+    label: 'Inventory',
+    items: [
+      { label: 'Warehouses', path: '/warehouses' },
+      { label: 'Item Balances', path: '/inventory-items' },
+      { label: 'Transactions', path: '/inventory-transactions' },
+    ],
+  },
+  {
     label: 'Planning',
     items: [
       { label: 'Budgets', path: '/budgets' },

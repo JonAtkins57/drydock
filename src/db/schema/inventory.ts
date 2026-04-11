@@ -1,5 +1,5 @@
 import { pgSchema, uuid, text, boolean, timestamp, numeric } from 'drizzle-orm/pg-core';
-// Cross-schema FKs to drydock_master omitted — referenced as uuid() only per master.ts convention
+import { items } from './master.js';
 
 export const inventorySchema = pgSchema('drydock_inventory');
 
@@ -30,9 +30,8 @@ export const warehouses = inventorySchema.table('warehouses', {
 export const inventoryItems = inventorySchema.table('inventory_items', {
   id: uuid('id').defaultRandom().primaryKey(),
   tenantId: uuid('tenant_id').notNull(),
-  // FK to drydock_master.items.id — cross-schema, typed as uuid only
-  itemId: uuid('item_id').notNull(),
-  warehouseId: uuid('warehouse_id').notNull(),
+  itemId: uuid('item_id').notNull().references(() => items.id),
+  warehouseId: uuid('warehouse_id').notNull().references(() => warehouses.id),
   quantityOnHand: numeric('quantity_on_hand', { precision: 18, scale: 4 }).notNull().default('0'),
   unitCost: numeric('unit_cost', { precision: 18, scale: 4 }).notNull().default('0'),
   totalCost: numeric('total_cost', { precision: 18, scale: 4 }).notNull().default('0'),
@@ -48,11 +47,10 @@ export const inventoryTransactions = inventorySchema.table('inventory_transactio
   id: uuid('id').defaultRandom().primaryKey(),
   tenantId: uuid('tenant_id').notNull(),
   transactionType: inventoryTransactionTypeEnum('transaction_type').notNull(),
-  // FK to drydock_master.items.id — cross-schema
-  itemId: uuid('item_id').notNull(),
-  warehouseId: uuid('warehouse_id').notNull(),
+  itemId: uuid('item_id').notNull().references(() => items.id),
+  warehouseId: uuid('warehouse_id').notNull().references(() => warehouses.id),
   // For transfers: the source warehouse
-  fromWarehouseId: uuid('from_warehouse_id'),
+  fromWarehouseId: uuid('from_warehouse_id').references(() => warehouses.id),
   quantity: numeric('quantity', { precision: 18, scale: 4 }).notNull(),
   unitCost: numeric('unit_cost', { precision: 18, scale: 4 }).notNull(),
   // Signed: positive for inbound (receipt/adjustment/count/transfer), negative for issue

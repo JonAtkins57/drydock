@@ -340,6 +340,20 @@ export const endpoints = {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     }).then(() => undefined);
   },
+
+  // Inventory
+  warehouses: (page = 1, pageSize = 50) =>
+    api<{ data: unknown[]; meta: { total: number; page: number; pageSize: number; totalPages: number } }>(
+      `/inventory/warehouses?page=${page}&pageSize=${pageSize}`
+    ),
+  inventoryItems: (page = 1, pageSize = 50) =>
+    api<{ data: unknown[]; meta: { total: number; page: number; pageSize: number; totalPages: number } }>(
+      `/inventory/items?page=${page}&pageSize=${pageSize}`
+    ),
+  inventoryTransactions: (page = 1, pageSize = 50) =>
+    api<{ data: unknown[]; meta: { total: number; page: number; pageSize: number; totalPages: number } }>(
+      `/inventory/transactions?page=${page}&pageSize=${pageSize}`
+    ),
 };
 
 export interface AttachmentRow {
