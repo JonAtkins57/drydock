@@ -201,6 +201,13 @@ export async function creditMemoRoutes(fastify: FastifyInstance): Promise<void> 
       return reply.status(404).send({ error: 'NOT_FOUND', message: 'Credit memo not found' });
     }
 
+    if (existing.status !== 'draft' && existing.status !== 'rejected') {
+      return reply.status(422).send({
+        error: 'VALIDATION',
+        message: 'Only draft or rejected credit memos can be voided',
+      });
+    }
+
     await db
       .update(creditMemos)
       .set({ status: 'voided' })
@@ -335,6 +342,14 @@ export async function creditMemoRoutes(fastify: FastifyInstance): Promise<void> 
         .from(creditMemoLines)
         .where(eq(creditMemoLines.memoId, id))
         .orderBy(creditMemoLines.lineNumber);
+
+      const lineSum = lines.reduce((sum, l) => sum + l.amount, 0);
+      if (lineSum !== memo.totalAmount) {
+        return reply.status(422).send({
+          error: 'VALIDATION',
+          message: `Credit memo line amounts (${lineSum}) do not sum to totalAmount (${memo.totalAmount})`,
+        });
+      }
 
       glLines = [
         { accountId: memo.arAccountId, debitAmount: memo.totalAmount, creditAmount: 0 },
