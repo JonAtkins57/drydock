@@ -76,6 +76,31 @@ function ConfidenceBar({ confidence }: { confidence: number }) {
   );
 }
 
+interface SuggestionItem {
+  accountId: string;
+  accountName: string;
+  confidence: number;
+  rank: number;
+}
+
+interface SuggestionState {
+  suggestionId: string;
+  items: SuggestionItem[];
+}
+
+function SuggestionPill({ accountName, confidence, onClick }: { accountName: string; confidence: number; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs bg-drydock-accent/10 text-drydock-accent border border-drydock-accent/20 hover:bg-drydock-accent/20 transition-colors"
+    >
+      <span>{accountName}</span>
+      <span className="text-drydock-accent/60">{Math.round(confidence * 100)}%</span>
+    </button>
+  );
+}
+
 export default function ApInvoiceDetail() {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
@@ -83,6 +108,7 @@ export default function ApInvoiceDetail() {
   const [invoice, setInvoice] = useState<ApInvoice | null>(null);
   const [loading, setLoading] = useState(true);
   const [coding, setCoding] = useState<Record<string, { glAccountId: string; department: string; project: string }>>({});
+  const [suggestions, setSuggestions] = useState<Record<string, SuggestionState | null>>({});
 
   useEffect(() => {
     if (!user) { navigate('/login'); return; }
@@ -121,6 +147,34 @@ export default function ApInvoiceDetail() {
 
   const updateCoding = (lineId: string, field: string, value: string) => {
     setCoding((prev) => ({ ...prev, [lineId]: { ...prev[lineId], [field]: value } }));
+  };
+
+  const handleSuggest = async (li: InvoiceLine) => {
+    try {
+      const res = await endpoints.apAutocodingSuggest(li.id);
+      setSuggestions((prev) => ({ ...prev, [li.id]: { suggestionId: res.suggestionId, items: res.suggestions } }));
+    } catch { /* */ }
+  };
+
+  const handleAcceptSuggestion = async (li: InvoiceLine, item: SuggestionItem) => {
+    const sugg = suggestions[li.id];
+    updateCoding(li.id, 'glAccountId', item.accountId);
+    if (sugg) {
+      try {
+        await endpoints.apAutocodingFeedback({ suggestionId: sugg.suggestionId, accepted: true, chosenAccountId: item.accountId, acceptedRank: item.rank });
+      } catch { /* */ }
+    }
+  };
+
+  const handleGlAccountBlur = async (li: InvoiceLine, newValue: string) => {
+    const sugg = suggestions[li.id];
+    if (!sugg) return;
+    const wassuggested = sugg.items.some((s) => s.accountId === newValue);
+    if (!wassuggested && newValue) {
+      try {
+        await endpoints.apAutocodingFeedback({ suggestionId: sugg.suggestionId, accepted: false, chosenAccountId: newValue, acceptedRank: null });
+      } catch { /* */ }
+    }
   };
 
   if (!user) return null;
@@ -315,10 +369,32 @@ export default function ApInvoiceDetail() {
                     <td className="px-5 py-3 text-sm text-drydock-text-dim text-right font-mono">{fmtDollars(li.unitPrice)}</td>
                     <td className="px-5 py-3 text-sm text-drydock-text text-right font-mono">{fmtDollars(li.amount)}</td>
                     <td className="px-5 py-2">
+                      {invoice.status === 'coding' && !coding[li.id]?.glAccountId && !suggestions[li.id] && (
+                        <button
+                          type="button"
+                          onClick={() => handleSuggest(li)}
+                          className="mb-1 px-2 py-0.5 text-xs bg-drydock-border text-drydock-steel rounded hover:text-drydock-text transition-colors"
+                        >
+                          Suggest
+                        </button>
+                      )}
+                      {suggestions[li.id] && suggestions[li.id]!.items.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mb-1">
+                          {suggestions[li.id]!.items.map((item) => (
+                            <SuggestionPill
+                              key={item.accountId}
+                              accountName={item.accountName}
+                              confidence={item.confidence}
+                              onClick={() => handleAcceptSuggestion(li, item)}
+                            />
+                          ))}
+                        </div>
+                      )}
                       <input
                         type="text"
                         value={coding[li.id]?.glAccountId ?? ''}
                         onChange={(e) => updateCoding(li.id, 'glAccountId', e.target.value)}
+                        onBlur={(e) => handleGlAccountBlur(li, e.target.value)}
                         className="w-full px-2 py-1.5 bg-drydock-bg border border-drydock-border rounded text-xs
                           text-drydock-text focus:outline-none focus:border-drydock-accent"
                         placeholder="Account"

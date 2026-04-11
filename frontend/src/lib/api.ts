@@ -192,6 +192,23 @@ export const endpoints = {
   apApplyCoding: (id: string, data: unknown) =>
     api(`/ap-invoices/${id}/actions/code`, { method: 'POST', body: data }),
 
+  // AP Auto-Coding (ML suggestions)
+  apAutocodingSuggest: (apInvoiceLineId: string) =>
+    api<{ suggestionId: string; suggestions: { accountId: string; accountName: string; confidence: number; rank: number }[] }>(
+      '/ap/auto-coding/suggestions',
+      { method: 'POST', body: { apInvoiceLineId } }
+    ),
+  apAutocodingFeedback: (data: { suggestionId: string; accepted: boolean; chosenAccountId: string; acceptedRank?: number | null }) =>
+    api('/ap/auto-coding/feedback', { method: 'POST', body: data }),
+  apAutocodingMetrics: () =>
+    api<{
+      totalSuggestions: number;
+      acceptedCount: number;
+      rejectedCount: number;
+      acceptanceRate: number;
+      topAccounts: { accountId: string; accountName: string; frequency: number; acceptanceRate: number }[];
+    }>('/ap/auto-coding/metrics'),
+
   // Goods Receipts
   goodsReceipts: (page = 1, pageSize = 25) =>
     api<{ data: unknown[]; meta: { total: number; page: number; pageSize: number; totalPages: number } }>(
