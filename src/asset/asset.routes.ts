@@ -1,16 +1,46 @@
 import { z } from 'zod';
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import { eq, desc, count } from 'drizzle-orm';
+import { eq, desc, count, and } from 'drizzle-orm';
 import { authenticateHook, setTenantContext } from '../core/auth.middleware.js';
 import { db } from '../db/connection.js';
-import { fixedAssets } from '../db/schema/index.js';
+import { fixedAssets, assetDepreciationBooks, assetDisposals } from '../db/schema/index.js';
 import { generateNumber } from '../core/numbering.service.js';
+import { createJournalEntry } from '../gl/posting.service.js';
 
 // ── Schemas ────────────────────────────────────────────────────────
 
 const listQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
   pageSize: z.coerce.number().int().positive().max(200).default(50),
+});
+
+const patchAssetSchema = z.object({
+  name: z.string().min(1).optional(),
+  description: z.string().optional(),
+  locationId: z.string().uuid().nullish(),
+  departmentId: z.string().uuid().nullish(),
+  usefulLifeMonths: z.number().int().min(1).optional(),
+  salvageValue: z.number().int().min(0).optional(),
+});
+
+const depreciateSchema = z.object({
+  bookType: z.enum(['tax', 'gaap', 'internal']),
+  periodDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'periodDate must be YYYY-MM-DD'),
+  unitsProduced: z.number().int().positive().optional(),
+  periodId: z.string().uuid().optional(),
+  depreciationAccountId: z.string().uuid().optional(),
+  accumulatedDepreciationAccountId: z.string().uuid().optional(),
+});
+
+const disposeSchema = z.object({
+  disposalType: z.enum(['sale', 'scrap', 'donation', 'write_off']),
+  disposalDate: z.string().datetime(),
+  proceedsAmount: z.number().int().min(0).default(0),
+  notes: z.string().optional(),
+  periodId: z.string().uuid().optional(),
+  gainLossAccountId: z.string().uuid().optional(),
+  assetAccountId: z.string().uuid().optional(),
+  accumulatedDepreciationAccountId: z.string().uuid().optional(),
 });
 
 const createAssetSchema = z.object({
@@ -127,5 +157,322 @@ export async function assetRoutes(fastify: FastifyInstance): Promise<void> {
       .returning();
 
     return reply.status(201).send(asset);
+  });
+
+  // GET /:id — single asset
+  fastify.get('/:id', async (request: FastifyRequest, reply: FastifyReply) => {
+    const { id } = request.params as { id: string };
+    const { tenantId } = request.currentUser;
+
+    const [asset] = await db
+      .select()
+      .from(fixedAssets)
+      .where(and(eq(fixedAssets.id, id), eq(fixedAssets.tenantId, tenantId)))
+      .limit(1);
+
+    if (!asset) {
+      return reply.status(404).send({ error: 'NOT_FOUND', message: 'Asset not found' });
+    }
+
+    return reply.send(asset);
+  });
+
+  // PATCH /:id — partial update
+  fastify.patch('/:id', async (request: FastifyRequest, reply: FastifyReply) => {
+    const { id } = request.params as { id: string };
+    const { tenantId, sub: userId } = request.currentUser;
+
+    const parsed = patchAssetSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(422).send({
+        error: 'VALIDATION',
+        message: 'Invalid request body',
+        details: parsed.error.flatten().fieldErrors,
+      });
+    }
+
+    const [existing] = await db
+      .select()
+      .from(fixedAssets)
+      .where(and(eq(fixedAssets.id, id), eq(fixedAssets.tenantId, tenantId)))
+      .limit(1);
+
+    if (!existing) {
+      return reply.status(404).send({ error: 'NOT_FOUND', message: 'Asset not found' });
+    }
+
+    const { name, description, locationId, departmentId, usefulLifeMonths, salvageValue } = parsed.data;
+    const updates: Partial<typeof fixedAssets.$inferInsert> = {
+      updatedAt: new Date(),
+      updatedBy: userId,
+    };
+    if (name !== undefined) updates.name = name;
+    if (description !== undefined) updates.description = description ?? null;
+    if (locationId !== undefined) updates.locationId = locationId ?? null;
+    if (departmentId !== undefined) updates.departmentId = departmentId ?? null;
+    if (usefulLifeMonths !== undefined) updates.usefulLifeMonths = usefulLifeMonths;
+    if (salvageValue !== undefined) updates.salvageValue = salvageValue;
+
+    const [updated] = await db
+      .update(fixedAssets)
+      .set(updates)
+      .where(and(eq(fixedAssets.id, id), eq(fixedAssets.tenantId, tenantId)))
+      .returning();
+
+    return reply.send(updated);
+  });
+
+  // POST /:id/actions/depreciate — run one period of depreciation
+  fastify.post('/:id/actions/depreciate', async (request: FastifyRequest, reply: FastifyReply) => {
+    const { id } = request.params as { id: string };
+    const { tenantId, sub: userId } = request.currentUser;
+
+    const parsed = depreciateSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(422).send({
+        error: 'VALIDATION',
+        message: 'Invalid request body',
+        details: parsed.error.flatten().fieldErrors,
+      });
+    }
+
+    const { bookType, periodDate, unitsProduced, periodId, depreciationAccountId, accumulatedDepreciationAccountId } = parsed.data;
+
+    // Fetch asset
+    const [asset] = await db
+      .select()
+      .from(fixedAssets)
+      .where(and(eq(fixedAssets.id, id), eq(fixedAssets.tenantId, tenantId)))
+      .limit(1);
+
+    if (!asset) {
+      return reply.status(404).send({ error: 'NOT_FOUND', message: 'Asset not found' });
+    }
+
+    if (asset.status === 'disposed' || asset.status === 'fully_depreciated') {
+      return reply.status(422).send({
+        error: 'VALIDATION',
+        message: `Cannot depreciate asset with status: ${asset.status}`,
+      });
+    }
+
+    // Check for duplicate period
+    const [existing] = await db
+      .select({ id: assetDepreciationBooks.id })
+      .from(assetDepreciationBooks)
+      .where(
+        and(
+          eq(assetDepreciationBooks.assetId, id),
+          eq(assetDepreciationBooks.bookType, bookType),
+          eq(assetDepreciationBooks.periodDate, periodDate),
+        ),
+      )
+      .limit(1);
+
+    if (existing) {
+      return reply.status(409).send({
+        error: 'CONFLICT',
+        message: 'Depreciation already posted for this asset, book type, and period',
+      });
+    }
+
+    // Calculate depreciation expense
+    const currentNBV = asset.netBookValue;
+    const { acquisitionCost, salvageValue, usefulLifeMonths, depreciationMethod } = asset;
+    let expenseAmount: number;
+
+    if (depreciationMethod === 'straight_line') {
+      expenseAmount = Math.floor((acquisitionCost - salvageValue) / usefulLifeMonths);
+    } else if (depreciationMethod === 'declining_balance') {
+      expenseAmount = Math.floor((currentNBV * 2) / usefulLifeMonths);
+    } else {
+      // units_of_production — usefulLifeMonths repurposed as totalUnitsEstimated
+      if (unitsProduced === undefined) {
+        return reply.status(422).send({
+          error: 'VALIDATION',
+          message: 'unitsProduced is required for units_of_production method',
+        });
+      }
+      expenseAmount = Math.floor(((acquisitionCost - salvageValue) / usefulLifeMonths) * unitsProduced);
+    }
+
+    // Cap so NBV never drops below salvageValue
+    const maxExpense = currentNBV - salvageValue;
+    const cappedExpense = Math.min(expenseAmount, Math.max(0, maxExpense));
+
+    const newAccumulated = asset.accumulatedDepreciation + cappedExpense;
+    const newNBV = currentNBV - cappedExpense;
+    const fullyDepreciated = newNBV <= salvageValue;
+
+    // Post GL entry if all GL params provided
+    if (periodId && depreciationAccountId && accumulatedDepreciationAccountId) {
+      const glResult = await createJournalEntry(
+        tenantId,
+        {
+          journalType: 'automated',
+          periodId,
+          postingDate: new Date().toISOString(),
+          description: `Depreciation - ${asset.assetNumber} ${asset.name} (${bookType}) ${periodDate}`,
+          sourceModule: 'asset',
+          sourceEntityType: 'fixed_asset',
+          sourceEntityId: asset.id,
+          lines: [
+            { accountId: depreciationAccountId, debitAmount: cappedExpense, creditAmount: 0 },
+            { accountId: accumulatedDepreciationAccountId, debitAmount: 0, creditAmount: cappedExpense },
+          ],
+        },
+        userId,
+      );
+
+      if (!glResult.ok) {
+        return reply.status(422).send({
+          error: 'GL_ERROR',
+          message: glResult.error.message,
+        });
+      }
+    }
+
+    // Persist book row + update asset in transaction
+    const result = await db.transaction(async (tx) => {
+      const [bookRow] = await tx
+        .insert(assetDepreciationBooks)
+        .values({
+          tenantId,
+          assetId: id,
+          bookType,
+          periodDate,
+          beginningBookValue: currentNBV,
+          depreciationExpense: cappedExpense,
+          accumulatedDepreciation: newAccumulated,
+          endingBookValue: newNBV,
+          createdBy: userId,
+        })
+        .returning();
+
+      const [updatedAsset] = await tx
+        .update(fixedAssets)
+        .set({
+          accumulatedDepreciation: newAccumulated,
+          netBookValue: newNBV,
+          status: fullyDepreciated ? 'fully_depreciated' : 'active',
+          updatedAt: new Date(),
+          updatedBy: userId,
+        })
+        .where(and(eq(fixedAssets.id, id), eq(fixedAssets.tenantId, tenantId)))
+        .returning();
+
+      return { bookRow, asset: updatedAsset };
+    });
+
+    return reply.status(201).send(result);
+  });
+
+  // POST /:id/actions/dispose — record asset disposal
+  fastify.post('/:id/actions/dispose', async (request: FastifyRequest, reply: FastifyReply) => {
+    const { id } = request.params as { id: string };
+    const { tenantId, sub: userId } = request.currentUser;
+
+    const parsed = disposeSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(422).send({
+        error: 'VALIDATION',
+        message: 'Invalid request body',
+        details: parsed.error.flatten().fieldErrors,
+      });
+    }
+
+    const { disposalType, disposalDate, proceedsAmount, notes, periodId, gainLossAccountId, assetAccountId, accumulatedDepreciationAccountId } = parsed.data;
+
+    // Fetch asset
+    const [asset] = await db
+      .select()
+      .from(fixedAssets)
+      .where(and(eq(fixedAssets.id, id), eq(fixedAssets.tenantId, tenantId)))
+      .limit(1);
+
+    if (!asset) {
+      return reply.status(404).send({ error: 'NOT_FOUND', message: 'Asset not found' });
+    }
+
+    if (asset.status === 'disposed') {
+      return reply.status(422).send({
+        error: 'VALIDATION',
+        message: 'Asset is already disposed',
+      });
+    }
+
+    const netBookValueAtDisposal = asset.netBookValue;
+    const gainLossAmount = proceedsAmount - netBookValueAtDisposal;
+
+    // Post GL entry if all GL params provided
+    if (periodId && gainLossAccountId && assetAccountId && accumulatedDepreciationAccountId) {
+      const glLines: Array<{ accountId: string; debitAmount: number; creditAmount: number }> = [
+        { accountId: accumulatedDepreciationAccountId, debitAmount: asset.accumulatedDepreciation, creditAmount: 0 },
+        { accountId: assetAccountId, debitAmount: 0, creditAmount: asset.acquisitionCost },
+      ];
+
+      if (gainLossAmount > 0) {
+        glLines.push({ accountId: gainLossAccountId, debitAmount: 0, creditAmount: gainLossAmount });
+      } else if (gainLossAmount < 0) {
+        glLines.push({ accountId: gainLossAccountId, debitAmount: Math.abs(gainLossAmount), creditAmount: 0 });
+      }
+
+      const glResult = await createJournalEntry(
+        tenantId,
+        {
+          journalType: 'automated',
+          periodId,
+          postingDate: new Date(disposalDate).toISOString(),
+          description: `Asset disposal - ${asset.assetNumber} ${asset.name} (${disposalType})`,
+          sourceModule: 'asset',
+          sourceEntityType: 'fixed_asset',
+          sourceEntityId: asset.id,
+          lines: glLines,
+        },
+        userId,
+      );
+
+      if (!glResult.ok) {
+        return reply.status(422).send({
+          error: 'GL_ERROR',
+          message: glResult.error.message,
+        });
+      }
+    }
+
+    // Persist disposal + update asset in transaction
+    const result = await db.transaction(async (tx) => {
+      const [disposal] = await tx
+        .insert(assetDisposals)
+        .values({
+          tenantId,
+          assetId: id,
+          disposalType,
+          disposalDate: new Date(disposalDate),
+          proceedsAmount,
+          netBookValueAtDisposal,
+          gainLossAmount,
+          notes: notes ?? null,
+          createdBy: userId,
+        })
+        .returning();
+
+      const [updatedAsset] = await tx
+        .update(fixedAssets)
+        .set({
+          status: 'disposed',
+          disposalDate: new Date(disposalDate),
+          disposalProceeds: proceedsAmount,
+          isActive: false,
+          updatedAt: new Date(),
+          updatedBy: userId,
+        })
+        .where(and(eq(fixedAssets.id, id), eq(fixedAssets.tenantId, tenantId)))
+        .returning();
+
+      return { disposal, asset: updatedAsset };
+    });
+
+    return reply.status(201).send(result);
   });
 }

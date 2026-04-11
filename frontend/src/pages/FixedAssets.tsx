@@ -15,6 +15,8 @@ interface FixedAsset {
   salvageValue: number;
   usefulLifeMonths: number;
   depreciationMethod: string;
+  accumulatedDepreciation: number;
+  netBookValue: number;
   createdAt: string;
 }
 
@@ -44,6 +46,21 @@ export default function FixedAssets() {
   const [depreciationMethod, setDepreciationMethod] = useState('straight_line');
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
+
+  // Depreciate modal
+  const [depreciateAsset, setDepreciateAsset] = useState<FixedAsset | null>(null);
+  const [depBookType, setDepBookType] = useState('gaap');
+  const [depPeriodDate, setDepPeriodDate] = useState('');
+  const [depSubmitting, setDepSubmitting] = useState(false);
+  const [depError, setDepError] = useState('');
+
+  // Dispose modal
+  const [disposeAsset, setDisposeAsset] = useState<FixedAsset | null>(null);
+  const [dispDisposalType, setDispDisposalType] = useState('scrap');
+  const [dispDisposalDate, setDispDisposalDate] = useState('');
+  const [dispProceeds, setDispProceeds] = useState('');
+  const [dispSubmitting, setDispSubmitting] = useState(false);
+  const [dispError, setDispError] = useState('');
 
   useEffect(() => {
     if (!user) { navigate('/login'); return; }
@@ -84,6 +101,48 @@ export default function FixedAssets() {
       setFormError(err instanceof Error ? err.message : 'Failed to create asset');
     }
     setSubmitting(false);
+  };
+
+  const handleDepreciate = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!depreciateAsset) return;
+    setDepSubmitting(true);
+    setDepError('');
+    try {
+      await endpoints.depreciateAsset(depreciateAsset.id, {
+        bookType: depBookType,
+        periodDate: depPeriodDate,
+      });
+      setDepreciateAsset(null);
+      setDepBookType('gaap');
+      setDepPeriodDate('');
+      load();
+    } catch (err) {
+      setDepError(err instanceof Error ? err.message : 'Failed to post depreciation');
+    }
+    setDepSubmitting(false);
+  };
+
+  const handleDispose = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!disposeAsset) return;
+    setDispSubmitting(true);
+    setDispError('');
+    try {
+      await endpoints.disposeAsset(disposeAsset.id, {
+        disposalType: dispDisposalType,
+        disposalDate: new Date(dispDisposalDate).toISOString(),
+        proceedsAmount: dispProceeds ? Math.round(parseFloat(dispProceeds) * 100) : 0,
+      });
+      setDisposeAsset(null);
+      setDispDisposalType('scrap');
+      setDispDisposalDate('');
+      setDispProceeds('');
+      load();
+    } catch (err) {
+      setDispError(err instanceof Error ? err.message : 'Failed to record disposal');
+    }
+    setDispSubmitting(false);
   };
 
   if (!user) return null;
@@ -229,6 +288,131 @@ export default function FixedAssets() {
           </div>
         )}
 
+        {/* Depreciate Modal */}
+        {depreciateAsset && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/60" onClick={() => setDepreciateAsset(null)} />
+            <div className="relative bg-drydock-card border border-drydock-border rounded-lg p-6 w-full max-w-md shadow-2xl">
+              <h2 className="text-lg font-medium text-drydock-text mb-1">Post Depreciation</h2>
+              <p className="text-sm text-drydock-steel mb-4">{depreciateAsset.assetNumber} — {depreciateAsset.name}</p>
+
+              {depError && (
+                <div className="mb-4 p-3 rounded bg-red-900/30 border border-red-700/50 text-red-300 text-sm">{depError}</div>
+              )}
+
+              <form onSubmit={handleDepreciate} className="space-y-4">
+                <div>
+                  <label className="block text-sm text-drydock-text-dim mb-1">Book Type</label>
+                  <select
+                    value={depBookType}
+                    onChange={(e) => setDepBookType(e.target.value)}
+                    className="w-full px-3 py-2 bg-drydock-bg border border-drydock-border rounded-md text-drydock-text focus:outline-none focus:border-drydock-accent"
+                  >
+                    <option value="gaap">GAAP</option>
+                    <option value="tax">Tax</option>
+                    <option value="internal">Internal</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm text-drydock-text-dim mb-1">Period Date</label>
+                  <input
+                    type="date"
+                    value={depPeriodDate}
+                    onChange={(e) => setDepPeriodDate(e.target.value)}
+                    required
+                    className="w-full px-3 py-2 bg-drydock-bg border border-drydock-border rounded-md text-drydock-text focus:outline-none focus:border-drydock-accent"
+                  />
+                </div>
+                <div className="flex gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setDepreciateAsset(null)}
+                    className="flex-1 py-2 px-4 text-sm text-drydock-steel border border-drydock-border rounded-md hover:text-drydock-text transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={depSubmitting || !depPeriodDate}
+                    className="flex-1 py-2 px-4 text-sm bg-drydock-accent hover:bg-drydock-accent-dim text-drydock-dark font-medium rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {depSubmitting ? 'Posting...' : 'Post Depreciation'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Dispose Modal */}
+        {disposeAsset && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/60" onClick={() => setDisposeAsset(null)} />
+            <div className="relative bg-drydock-card border border-drydock-border rounded-lg p-6 w-full max-w-md shadow-2xl">
+              <h2 className="text-lg font-medium text-drydock-text mb-1">Dispose Asset</h2>
+              <p className="text-sm text-drydock-steel mb-4">{disposeAsset.assetNumber} — {disposeAsset.name}</p>
+
+              {dispError && (
+                <div className="mb-4 p-3 rounded bg-red-900/30 border border-red-700/50 text-red-300 text-sm">{dispError}</div>
+              )}
+
+              <form onSubmit={handleDispose} className="space-y-4">
+                <div>
+                  <label className="block text-sm text-drydock-text-dim mb-1">Disposal Type</label>
+                  <select
+                    value={dispDisposalType}
+                    onChange={(e) => setDispDisposalType(e.target.value)}
+                    className="w-full px-3 py-2 bg-drydock-bg border border-drydock-border rounded-md text-drydock-text focus:outline-none focus:border-drydock-accent"
+                  >
+                    <option value="scrap">Scrap</option>
+                    <option value="sale">Sale</option>
+                    <option value="donation">Donation</option>
+                    <option value="write_off">Write Off</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm text-drydock-text-dim mb-1">Disposal Date</label>
+                  <input
+                    type="date"
+                    value={dispDisposalDate}
+                    onChange={(e) => setDispDisposalDate(e.target.value)}
+                    required
+                    className="w-full px-3 py-2 bg-drydock-bg border border-drydock-border rounded-md text-drydock-text focus:outline-none focus:border-drydock-accent"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-drydock-text-dim mb-1">Proceeds ($)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={dispProceeds}
+                    onChange={(e) => setDispProceeds(e.target.value)}
+                    className="w-full px-3 py-2 bg-drydock-bg border border-drydock-border rounded-md text-drydock-text font-mono focus:outline-none focus:border-drydock-accent"
+                    placeholder="0.00"
+                  />
+                </div>
+                <div className="flex gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setDisposeAsset(null)}
+                    className="flex-1 py-2 px-4 text-sm text-drydock-steel border border-drydock-border rounded-md hover:text-drydock-text transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={dispSubmitting || !dispDisposalDate}
+                    className="flex-1 py-2 px-4 text-sm bg-red-700 hover:bg-red-600 text-white font-medium rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {dispSubmitting ? 'Disposing...' : 'Confirm Disposal'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
         {/* Table */}
         <div className="bg-drydock-card border border-drydock-border rounded-lg overflow-hidden">
           <table className="w-full">
@@ -237,23 +421,26 @@ export default function FixedAssets() {
                 <th className="text-left px-5 py-3 text-xs text-drydock-steel uppercase tracking-wider font-medium">Asset #</th>
                 <th className="text-left px-5 py-3 text-xs text-drydock-steel uppercase tracking-wider font-medium">Name</th>
                 <th className="text-left px-5 py-3 text-xs text-drydock-steel uppercase tracking-wider font-medium">Class</th>
-                <th className="text-left px-5 py-3 text-xs text-drydock-steel uppercase tracking-wider font-medium">Depreciation Method</th>
+                <th className="text-left px-5 py-3 text-xs text-drydock-steel uppercase tracking-wider font-medium">Method</th>
                 <th className="text-left px-5 py-3 text-xs text-drydock-steel uppercase tracking-wider font-medium">Status</th>
-                <th className="text-left px-5 py-3 text-xs text-drydock-steel uppercase tracking-wider font-medium">Acquisition Date</th>
+                <th className="text-left px-5 py-3 text-xs text-drydock-steel uppercase tracking-wider font-medium">Acq. Date</th>
                 <th className="text-right px-5 py-3 text-xs text-drydock-steel uppercase tracking-wider font-medium">Cost</th>
+                <th className="text-right px-5 py-3 text-xs text-drydock-steel uppercase tracking-wider font-medium">Accum. Dep.</th>
+                <th className="text-right px-5 py-3 text-xs text-drydock-steel uppercase tracking-wider font-medium">NBV</th>
+                <th className="px-5 py-3 text-xs text-drydock-steel uppercase tracking-wider font-medium">Actions</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 Array.from({ length: 3 }).map((_, i) => (
                   <tr key={i} className="border-b border-drydock-border/50">
-                    {Array.from({ length: 7 }).map((_, j) => (
+                    {Array.from({ length: 10 }).map((_, j) => (
                       <td key={j} className="px-5 py-3"><div className="h-4 bg-drydock-border/30 rounded animate-pulse w-24" /></td>
                     ))}
                   </tr>
                 ))
               ) : items.length === 0 ? (
-                <tr><td colSpan={7} className="px-5 py-8 text-center text-drydock-steel">No fixed assets found</td></tr>
+                <tr><td colSpan={10} className="px-5 py-8 text-center text-drydock-steel">No fixed assets found</td></tr>
               ) : (
                 items.map((asset) => (
                   <tr key={asset.id} className="border-b border-drydock-border/50 hover:bg-drydock-bg/50 transition-colors">
@@ -270,6 +457,37 @@ export default function FixedAssets() {
                       {new Date(asset.acquisitionDate).toLocaleDateString()}
                     </td>
                     <td className="px-5 py-3 text-sm font-mono text-drydock-text text-right">{fmtDollars(asset.acquisitionCost)}</td>
+                    <td className="px-5 py-3 text-sm font-mono text-drydock-steel text-right">{fmtDollars(asset.accumulatedDepreciation ?? 0)}</td>
+                    <td className="px-5 py-3 text-sm font-mono text-drydock-text text-right">{fmtDollars(asset.netBookValue ?? asset.acquisitionCost)}</td>
+                    <td className="px-5 py-3">
+                      <div className="flex gap-2">
+                        {asset.status === 'active' && (
+                          <button
+                            onClick={() => {
+                              setDepreciateAsset(asset);
+                              setDepError('');
+                              setDepPeriodDate('');
+                            }}
+                            className="px-2 py-1 text-xs bg-drydock-accent/10 hover:bg-drydock-accent/20 text-drydock-accent border border-drydock-accent/30 rounded transition-colors"
+                          >
+                            Depreciate
+                          </button>
+                        )}
+                        {asset.status !== 'disposed' && (
+                          <button
+                            onClick={() => {
+                              setDisposeAsset(asset);
+                              setDispError('');
+                              setDispDisposalDate('');
+                              setDispProceeds('');
+                            }}
+                            className="px-2 py-1 text-xs bg-red-900/20 hover:bg-red-900/40 text-red-400 border border-red-700/30 rounded transition-colors"
+                          >
+                            Dispose
+                          </button>
+                        )}
+                      </div>
+                    </td>
                   </tr>
                 ))
               )}

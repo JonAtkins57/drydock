@@ -297,6 +297,10 @@ export const endpoints = {
       `/assets?page=${page}&pageSize=${pageSize}`
     ),
   createAsset: (data: unknown) => api('/assets', { method: 'POST', body: data }),
+  getAsset: (id: string) => api<unknown>(`/assets/${id}`),
+  updateAsset: (id: string, data: unknown) => api(`/assets/${id}`, { method: 'PATCH', body: data }),
+  depreciateAsset: (id: string, data: unknown) => api(`/assets/${id}/actions/depreciate`, { method: 'POST', body: data }),
+  disposeAsset: (id: string, data: unknown) => api(`/assets/${id}/actions/dispose`, { method: 'POST', body: data }),
 
   // Inventory
   warehouses: (page = 1, pageSize = 50) =>
