@@ -7,7 +7,7 @@ CREATE TABLE drydock_ap.coding_suggestions (
   ap_invoice_line_id UUID NOT NULL REFERENCES drydock_ap.ap_invoice_lines(id),
   vendor_id UUID NOT NULL,
   description_tokens TEXT NOT NULL,
-  suggestions JSONB NOT NULL DEFAULT '[]',
+  suggestions JSONB NOT NULL DEFAULT '[]'::jsonb,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

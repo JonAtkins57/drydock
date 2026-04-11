@@ -316,12 +316,13 @@ export async function getModelMetrics(
     const totalSuggestions = parseInt(countRows[0]?.total_suggestions ?? '0', 10);
     const acceptedCount = parseInt(feedbackRows[0]?.accepted_count ?? '0', 10);
     const rejectedCount = parseInt(feedbackRows[0]?.rejected_count ?? '0', 10);
+    const totalFeedback = acceptedCount + rejectedCount;
 
     return ok({
       totalSuggestions,
       acceptedCount,
       rejectedCount,
-      acceptanceRate: totalSuggestions > 0 ? acceptedCount / totalSuggestions : 0,
+      acceptanceRate: totalFeedback > 0 ? acceptedCount / totalFeedback : 0,
       topAccounts: topRows.map((r) => ({
         accountId: r.account_id,
         accountName: r.account_name,

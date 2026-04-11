@@ -125,6 +125,7 @@ export default function ApInvoiceDetail() {
         c[li.id] = { glAccountId: li.glAccountId ?? '', department: li.department ?? '', project: li.project ?? '' };
       });
       setCoding(c);
+      setSuggestions({});
     } catch { /* */ }
     setLoading(false);
   };
