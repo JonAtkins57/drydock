@@ -68,6 +68,7 @@ const SECTIONS: NavSection[] = [
     items: [
       { label: 'Income Statement', path: '/reports/income-statement' },
       { label: 'Balance Sheet', path: '/reports/balance-sheet' },
+      { label: 'Balance Sheet Roll-Forward', path: '/reports/balance-sheet-rollforward' },
     ],
   },
   {

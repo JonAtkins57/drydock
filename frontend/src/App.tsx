@@ -28,6 +28,7 @@ import BillingPlans from './pages/BillingPlans';
 import Statement from './pages/Statement';
 import IncomeStatement from './pages/reports/IncomeStatement';
 import BalanceSheet from './pages/reports/BalanceSheet';
+import BalanceSheetRollForward from './pages/reports/BalanceSheetRollForward';
 
 export default function App() {
   const { init, token } = useAuth();
@@ -67,6 +68,7 @@ export default function App() {
       <Route path="/customers/:id/statement" element={<Statement />} />
       <Route path="/reports/income-statement" element={<IncomeStatement />} />
       <Route path="/reports/balance-sheet" element={<BalanceSheet />} />
+      <Route path="/reports/balance-sheet-rollforward" element={<BalanceSheetRollForward />} />
       <Route path="/" element={token ? <Navigate to="/dashboard" /> : <Landing />} />
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>
