@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../lib/store';
 import { endpoints } from '../lib/api';
 import Sidebar from '../components/Sidebar';
@@ -57,6 +57,17 @@ export default function OccBilling() {
   const [formError, setFormError] = useState('');
   const [lastResult, setLastResult] = useState<{ runId: string; invoiceId: string | null } | null>(null);
 
+  // Rate card CRUD form
+  const [showCardForm, setShowCardForm] = useState(false);
+  const [editingCard, setEditingCard] = useState<RateCard | null>(null);
+  const [cardName, setCardName] = useState('');
+  const [cardMeterType, setCardMeterType] = useState('');
+  const [cardUnitPriceCents, setCardUnitPriceCents] = useState('');
+  const [cardCurrency, setCardCurrency] = useState('USD');
+  const [cardDescription, setCardDescription] = useState('');
+  const [cardFormError, setCardFormError] = useState('');
+  const [cardSubmitting, setCardSubmitting] = useState(false);
+
   useEffect(() => {
     if (!user) { navigate('/login'); return; }
     loadRateCards();
@@ -99,6 +110,78 @@ export default function OccBilling() {
     }
     setSubmitting(false);
   };
+
+  const openCreateCard = () => {
+    setEditingCard(null);
+    setCardName('');
+    setCardMeterType('');
+    setCardUnitPriceCents('');
+    setCardCurrency('USD');
+    setCardDescription('');
+    setCardFormError('');
+    setShowCardForm(true);
+  };
+
+  const openEditCard = (card: RateCard) => {
+    setEditingCard(card);
+    setCardName(card.name);
+    setCardMeterType(card.meterType);
+    setCardUnitPriceCents(String(card.unitPriceCents));
+    setCardCurrency(card.currency);
+    setCardDescription(card.description ?? '');
+    setCardFormError('');
+    setShowCardForm(true);
+  };
+
+  const handleCardSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    const priceCents = parseInt(cardUnitPriceCents, 10);
+    if (isNaN(priceCents) || priceCents <= 0) {
+      setCardFormError('Unit price must be a positive integer (cents)');
+      return;
+    }
+    setCardSubmitting(true);
+    setCardFormError('');
+    try {
+      if (editingCard) {
+        await endpoints.occUpdateRateCard(editingCard.id, {
+          name: cardName.trim(),
+          unitPriceCents: priceCents,
+          currency: cardCurrency.trim() || 'USD',
+          description: cardDescription.trim() || undefined,
+        });
+      } else {
+        await endpoints.occCreateRateCard({
+          name: cardName.trim(),
+          meterType: cardMeterType.trim(),
+          unitPriceCents: priceCents,
+          currency: cardCurrency.trim() || 'USD',
+          description: cardDescription.trim() || undefined,
+        });
+      }
+      setShowCardForm(false);
+      loadRateCards();
+    } catch (err) {
+      setCardFormError(err instanceof Error ? err.message : 'Save failed');
+    }
+    setCardSubmitting(false);
+  };
+
+  const handleDeleteCard = async (card: RateCard) => {
+    if (!window.confirm(`Delete rate card "${card.name}"? This will deactivate it.`)) return;
+    try {
+      await endpoints.occDeleteRateCard(card.id);
+      loadRateCards();
+    } catch { /* */ }
+  };
+
+  // Reconciliation stats — computed from already-fetched runs (no extra API calls)
+  const totalRuns = runs.length;
+  const runsByStatus = runs.reduce<Record<string, number>>((acc, r) => {
+    acc[r.status] = (acc[r.status] ?? 0) + 1;
+    return acc;
+  }, {});
+  const totalBilledCents = runs.reduce((sum, r) => sum + (r.totalAmountCents ?? 0), 0);
 
   if (!user) return null;
 
@@ -216,9 +299,128 @@ export default function OccBilling() {
           </div>
         )}
 
+        {/* Rate Card create/edit modal */}
+        {showCardForm && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/60" onClick={() => setShowCardForm(false)} />
+            <div className="relative bg-drydock-card border border-drydock-border rounded-lg p-6 w-full max-w-md shadow-2xl">
+              <h2 className="text-lg font-medium text-drydock-text mb-4">
+                {editingCard ? 'Edit Rate Card' : 'Create Rate Card'}
+              </h2>
+
+              {cardFormError && (
+                <div className="mb-4 p-3 rounded bg-red-900/30 border border-red-700/50 text-red-300 text-sm">
+                  {cardFormError}
+                </div>
+              )}
+
+              <form onSubmit={handleCardSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-sm text-drydock-text-dim mb-1">Name</label>
+                  <input
+                    type="text"
+                    value={cardName}
+                    onChange={(e) => setCardName(e.target.value)}
+                    required
+                    autoFocus
+                    placeholder="e.g. API Calls — Standard"
+                    className="w-full px-3 py-2 bg-drydock-bg border border-drydock-border rounded-md
+                      text-drydock-text placeholder-drydock-steel text-sm
+                      focus:outline-none focus:border-drydock-accent focus:ring-1 focus:ring-drydock-accent/30"
+                  />
+                </div>
+                {!editingCard && (
+                  <div>
+                    <label className="block text-sm text-drydock-text-dim mb-1">Meter Type</label>
+                    <input
+                      type="text"
+                      value={cardMeterType}
+                      onChange={(e) => setCardMeterType(e.target.value)}
+                      required
+                      placeholder="e.g. api_calls"
+                      className="w-full px-3 py-2 bg-drydock-bg border border-drydock-border rounded-md
+                        text-drydock-text placeholder-drydock-steel font-mono text-sm
+                        focus:outline-none focus:border-drydock-accent focus:ring-1 focus:ring-drydock-accent/30"
+                    />
+                  </div>
+                )}
+                <div>
+                  <label className="block text-sm text-drydock-text-dim mb-1">Unit Price (cents)</label>
+                  <input
+                    type="number"
+                    value={cardUnitPriceCents}
+                    onChange={(e) => setCardUnitPriceCents(e.target.value)}
+                    required
+                    min="1"
+                    step="1"
+                    placeholder="e.g. 100 = $1.00"
+                    className="w-full px-3 py-2 bg-drydock-bg border border-drydock-border rounded-md
+                      text-drydock-text placeholder-drydock-steel font-mono text-sm
+                      focus:outline-none focus:border-drydock-accent focus:ring-1 focus:ring-drydock-accent/30"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-drydock-text-dim mb-1">Currency</label>
+                  <input
+                    type="text"
+                    value={cardCurrency}
+                    onChange={(e) => setCardCurrency(e.target.value)}
+                    placeholder="USD"
+                    maxLength={3}
+                    className="w-full px-3 py-2 bg-drydock-bg border border-drydock-border rounded-md
+                      text-drydock-text placeholder-drydock-steel font-mono text-sm uppercase
+                      focus:outline-none focus:border-drydock-accent focus:ring-1 focus:ring-drydock-accent/30"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-drydock-text-dim mb-1">Description</label>
+                  <input
+                    type="text"
+                    value={cardDescription}
+                    onChange={(e) => setCardDescription(e.target.value)}
+                    placeholder="Optional description"
+                    className="w-full px-3 py-2 bg-drydock-bg border border-drydock-border rounded-md
+                      text-drydock-text placeholder-drydock-steel text-sm
+                      focus:outline-none focus:border-drydock-accent focus:ring-1 focus:ring-drydock-accent/30"
+                  />
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowCardForm(false)}
+                    className="flex-1 py-2 px-4 text-sm text-drydock-steel border border-drydock-border rounded-md
+                      hover:text-drydock-text hover:border-drydock-steel transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={cardSubmitting}
+                    className="flex-1 py-2 px-4 text-sm bg-drydock-accent hover:bg-drydock-accent-dim
+                      text-drydock-dark font-medium rounded-md
+                      disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {cardSubmitting ? 'Saving...' : (editingCard ? 'Save Changes' : 'Create')}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
         {/* Rate Cards */}
         <section>
-          <h2 className="text-base font-medium text-drydock-text mb-3">Rate Cards</h2>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-base font-medium text-drydock-text">Rate Cards</h2>
+            <button
+              onClick={openCreateCard}
+              className="px-3 py-1.5 text-sm border border-drydock-border text-drydock-text-dim
+                hover:text-drydock-text hover:border-drydock-steel rounded-md transition-colors"
+            >
+              + Add Card
+            </button>
+          </div>
           <div className="bg-drydock-card border border-drydock-border rounded-lg overflow-hidden">
             <table className="w-full">
               <thead>
@@ -228,19 +430,20 @@ export default function OccBilling() {
                   <th className="text-right px-5 py-3 text-xs text-drydock-steel uppercase tracking-wider font-medium">Unit Price</th>
                   <th className="text-left px-5 py-3 text-xs text-drydock-steel uppercase tracking-wider font-medium">Currency</th>
                   <th className="text-left px-5 py-3 text-xs text-drydock-steel uppercase tracking-wider font-medium">Status</th>
+                  <th className="text-right px-5 py-3 text-xs text-drydock-steel uppercase tracking-wider font-medium">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {loadingCards ? (
                   Array.from({ length: 2 }).map((_, i) => (
                     <tr key={i} className="border-b border-drydock-border/50">
-                      {Array.from({ length: 5 }).map((_, j) => (
+                      {Array.from({ length: 6 }).map((_, j) => (
                         <td key={j} className="px-5 py-3"><div className="h-4 bg-drydock-border/30 rounded animate-pulse w-24" /></td>
                       ))}
                     </tr>
                   ))
                 ) : rateCards.length === 0 ? (
-                  <tr><td colSpan={5} className="px-5 py-8 text-center text-drydock-steel">No rate cards configured</td></tr>
+                  <tr><td colSpan={6} className="px-5 py-8 text-center text-drydock-steel">No rate cards configured</td></tr>
                 ) : (
                   rateCards.map((card) => (
                     <tr key={card.id} className="border-b border-drydock-border/50 hover:bg-drydock-bg/50 transition-colors">
@@ -252,6 +455,22 @@ export default function OccBilling() {
                         <span className={`text-xs px-2 py-0.5 rounded-full border ${card.isActive ? 'bg-green-900/30 text-green-400 border-green-700/30' : 'bg-gray-800 text-gray-400 border-gray-700'}`}>
                           {card.isActive ? 'active' : 'inactive'}
                         </span>
+                      </td>
+                      <td className="px-5 py-3 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={() => openEditCard(card)}
+                            className="text-xs text-drydock-steel hover:text-drydock-text transition-colors px-2 py-1 rounded hover:bg-drydock-border/30"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleDeleteCard(card)}
+                            className="text-xs text-drydock-steel hover:text-red-400 transition-colors px-2 py-1 rounded hover:bg-red-900/20"
+                          >
+                            Delete
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -330,7 +549,14 @@ export default function OccBilling() {
                         {formatCents(run.totalAmountCents)}
                       </td>
                       <td className="px-5 py-3 text-sm font-mono text-drydock-steel text-xs">
-                        {run.invoiceId ? run.invoiceId.slice(0, 8) + '…' : '—'}
+                        {run.invoiceId ? (
+                          <Link
+                            to={`/invoices/${run.invoiceId}`}
+                            className="text-drydock-accent hover:underline"
+                          >
+                            {run.invoiceId.slice(0, 8)}…
+                          </Link>
+                        ) : '—'}
                       </td>
                       <td className="px-5 py-3 text-sm text-drydock-steel">
                         {new Date(run.startedAt).toLocaleString()}
@@ -342,6 +568,34 @@ export default function OccBilling() {
             </table>
           </div>
         </section>
+
+        {/* Reconciliation Summary — computed client-side from already-fetched runs */}
+        {totalRuns > 0 && (
+          <section>
+            <h2 className="text-base font-medium text-drydock-text mb-3">Reconciliation Summary</h2>
+            <div className="bg-drydock-card border border-drydock-border rounded-lg p-5 flex flex-wrap gap-8">
+              <div>
+                <p className="text-xs text-drydock-steel uppercase tracking-wider mb-1">Total Runs</p>
+                <p className="text-2xl font-medium text-drydock-text">{totalRuns}</p>
+              </div>
+              {Object.entries(runsByStatus).map(([status, count]) => (
+                <div key={status}>
+                  <p className="text-xs text-drydock-steel uppercase tracking-wider mb-1">{status}</p>
+                  <p className={`text-2xl font-medium ${
+                    status === 'complete' ? 'text-green-400'
+                    : status === 'failed' ? 'text-red-400'
+                    : status === 'running' ? 'text-blue-400'
+                    : 'text-yellow-400'
+                  }`}>{count}</p>
+                </div>
+              ))}
+              <div>
+                <p className="text-xs text-drydock-steel uppercase tracking-wider mb-1">Total Billed</p>
+                <p className="text-2xl font-medium font-mono text-drydock-text">{formatCents(totalBilledCents)}</p>
+              </div>
+            </div>
+          </section>
+        )}
 
       </main>
     </div>
