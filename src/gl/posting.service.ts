@@ -854,6 +854,209 @@ export async function reverseJournal(
   }
 }
 
+// ── Auto Post Journal (for recurring worker — bypasses approval chain) ──
+
+export async function autoPostJournal(
+  tenantId: string,
+  id: string,
+  userId: string,
+): Promise<Result<JournalEntry, AppError>> {
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    // 1. Lock and fetch the journal entry
+    const { rows: entryRows } = await client.query<{
+      id: string;
+      tenant_id: string;
+      status: string;
+      period_id: string;
+      journal_number: string;
+      journal_type: string;
+      entity_id: string | null;
+      posting_date: Date;
+      description: string | null;
+      source_module: string | null;
+      source_entity_type: string | null;
+      source_entity_id: string | null;
+      created_by: string | null;
+      approved_by: string | null;
+      posted_by: string | null;
+      posted_at: Date | null;
+      reversed_by_journal_id: string | null;
+      created_at: Date;
+      updated_at: Date;
+    }>(
+      `SELECT * FROM drydock_gl.journal_entries WHERE id = $1 AND tenant_id = $2 FOR UPDATE`,
+      [id, tenantId],
+    );
+
+    const entryRow = entryRows[0];
+    if (!entryRow) {
+      await client.query('ROLLBACK');
+      return err({ code: 'NOT_FOUND', message: 'Journal entry not found' });
+    }
+
+    // 2. Must be draft status
+    if (entryRow.status !== 'draft') {
+      await client.query('ROLLBACK');
+      return err({
+        code: 'VALIDATION',
+        message: `autoPostJournal requires draft status. Current status: '${entryRow.status}'`,
+      });
+    }
+
+    // 3. Must be automated journal type
+    if (entryRow.journal_type !== 'automated') {
+      await client.query('ROLLBACK');
+      return err({
+        code: 'VALIDATION',
+        message: `autoPostJournal only operates on automated journals. Journal type: '${entryRow.journal_type}'`,
+      });
+    }
+
+    // 4. Verify period is open
+    const { rows: periodRows } = await client.query<{ status: string }>(
+      `SELECT status FROM drydock_gl.accounting_periods WHERE id = $1 AND tenant_id = $2 FOR SHARE`,
+      [entryRow.period_id, tenantId],
+    );
+
+    const periodRow = periodRows[0];
+    if (!periodRow) {
+      await client.query('ROLLBACK');
+      return err({ code: 'NOT_FOUND', message: 'Accounting period not found' });
+    }
+
+    if (periodRow.status !== 'open') {
+      await client.query('ROLLBACK');
+      return err({
+        code: 'VALIDATION',
+        message: `Cannot post to period with status '${periodRow.status}'. Period must be 'open'.`,
+      });
+    }
+
+    // 5. Check journal balance via SQL function
+    const { rows: balanceRows } = await client.query<{ is_balanced: boolean }>(
+      `SELECT drydock_gl.check_journal_balance($1) AS is_balanced`,
+      [id],
+    );
+
+    const balanceRow = balanceRows[0];
+    if (!balanceRow || !balanceRow.is_balanced) {
+      await client.query('ROLLBACK');
+      return err({
+        code: 'VALIDATION',
+        message: 'Journal entry is unbalanced. Total debits must equal total credits.',
+      });
+    }
+
+    // 6. Verify all accounts are active posting accounts
+    const { rows: lineRows } = await client.query<{
+      line_number: number;
+      account_id: string;
+    }>(
+      `SELECT line_number, account_id FROM drydock_gl.journal_entry_lines WHERE journal_entry_id = $1`,
+      [id],
+    );
+
+    for (const line of lineRows) {
+      const { rows: acctRows } = await client.query<{
+        is_posting_account: boolean;
+        is_active: boolean;
+      }>(
+        `SELECT is_posting_account, is_active FROM drydock_gl.accounts WHERE id = $1 AND tenant_id = $2`,
+        [line.account_id, tenantId],
+      );
+
+      const acct = acctRows[0];
+      if (!acct) {
+        await client.query('ROLLBACK');
+        return err({
+          code: 'VALIDATION',
+          message: `Account ${line.account_id} on line ${line.line_number} not found`,
+        });
+      }
+      if (!acct.is_posting_account) {
+        await client.query('ROLLBACK');
+        return err({
+          code: 'VALIDATION',
+          message: `Account ${line.account_id} on line ${line.line_number} is not a posting account`,
+        });
+      }
+      if (!acct.is_active) {
+        await client.query('ROLLBACK');
+        return err({
+          code: 'VALIDATION',
+          message: `Account ${line.account_id} on line ${line.line_number} is inactive`,
+        });
+      }
+    }
+
+    // 7. Set status = posted directly (no approval chain)
+    const now = new Date();
+    const { rows: postedRows } = await client.query<{
+      id: string;
+      tenant_id: string;
+      entity_id: string | null;
+      journal_number: string;
+      journal_type: string;
+      period_id: string;
+      posting_date: Date;
+      description: string | null;
+      status: string;
+      source_module: string | null;
+      source_entity_type: string | null;
+      source_entity_id: string | null;
+      created_by: string | null;
+      approved_by: string | null;
+      posted_by: string | null;
+      posted_at: Date | null;
+      reversed_by_journal_id: string | null;
+      created_at: Date;
+      updated_at: Date;
+    }>(
+      `UPDATE drydock_gl.journal_entries
+       SET status = 'posted', posted_by = $1, posted_at = $2, updated_at = $2
+       WHERE id = $3 AND tenant_id = $4
+       RETURNING *`,
+      [userId, now.toISOString(), id, tenantId],
+    );
+
+    const postedRow = postedRows[0];
+    if (!postedRow) {
+      await client.query('ROLLBACK');
+      return err({ code: 'INTERNAL', message: 'Failed to auto-post journal entry' });
+    }
+
+    // 8. Write audit log
+    await client.query(
+      `INSERT INTO drydock_audit.audit_log (tenant_id, user_id, action, entity_type, entity_id, changes)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [
+        tenantId,
+        userId,
+        'journal_entry.auto_post',
+        'journal_entry',
+        id,
+        JSON.stringify({ journalNumber: postedRow.journal_number, postedAt: now.toISOString() }),
+      ],
+    );
+
+    await client.query('COMMIT');
+
+    return ok(mapRawToJournalEntry(postedRow));
+  } catch (error) {
+    await client.query('ROLLBACK');
+    return err({
+      code: 'INTERNAL',
+      message: error instanceof Error ? error.message : 'Unknown error during auto-posting',
+    });
+  } finally {
+    client.release();
+  }
+}
+
 // ── Helpers ────────────────────────────────────────────────────────
 
 function mapRawToJournalEntry(row: {
