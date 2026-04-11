@@ -244,133 +244,225 @@ export async function pullAndInvoice(
   periodEnd: string,
   createdBy: string,
 ): Promise<Result<{ runId: string; invoiceId: string | null }, AppError>> {
-  // 1. Load OCC config
+  // 1. Load OCC config (outside tx — read-only, no atomicity needed)
   const configResult = await getOccConfig(tenantId, configId);
   if (!configResult.ok) return configResult;
   const { config, customerId } = configResult.value;
 
-  // 2. Create a pull run record in pending state
-  const [run] = await db
-    .insert(occPullRuns)
+  // 2. Fetch usage from OCC (network call — outside tx)
+  const usageResult = await fetchOccUsage(config, periodStart, periodEnd);
+
+  // 3. Rate the usage (pure computation — outside tx)
+  const ratingResult = usageResult.ok
+    ? await rateUsage(tenantId, usageResult.value.meters)
+    : null;
+
+  const usage = usageResult.ok ? usageResult.value : null;
+  const rating = ratingResult?.ok ? ratingResult.value : null;
+
+  // Determine final status and error before entering tx
+  const runFailed = !usageResult.ok || !ratingResult?.ok;
+  const failureMessage = !usageResult.ok
+    ? usageResult.error.message
+    : !ratingResult?.ok
+      ? ratingResult.error.message
+      : null;
+
+  // 4. All DB writes are atomic in a single transaction
+  try {
+    const result = await db.transaction(async (tx) => {
+      // Create pull run record
+      const [run] = await tx
+        .insert(occPullRuns)
+        .values({
+          tenantId,
+          integrationConfigId: configId,
+          periodStart: new Date(periodStart),
+          periodEnd: new Date(periodEnd),
+          status: runFailed ? 'failed' : 'running',
+          rawUsage: usage ?? undefined,
+          errorMessage: failureMessage,
+          completedAt: runFailed ? new Date() : undefined,
+          createdBy,
+        })
+        .returning({ id: occPullRuns.id });
+
+      const runId = run.id;
+
+      if (runFailed || !rating || !usage) {
+        return { runId, invoiceId: null };
+      }
+
+      const { lines, totalAmountCents } = rating;
+
+      // Build usage summary: meterType -> quantity
+      const usageSummary: Record<string, number> = {};
+      for (const line of lines) {
+        usageSummary[line.meterType] = line.quantity;
+      }
+
+      // Insert usage lines
+      if (lines.length > 0) {
+        await tx.insert(occUsageLines).values(
+          lines.map((line) => ({
+            tenantId,
+            pullRunId: runId,
+            meterType: line.meterType,
+            rateCardId: line.rateCardId ?? null,
+            quantity: String(line.quantity),
+            unitPriceCents: line.unitPriceCents,
+            totalAmountCents: line.totalAmountCents,
+            description: line.description,
+          })),
+        );
+      }
+
+      // Create invoice if there is a customer and non-zero amount
+      let invoiceId: string | null = null;
+      if (customerId && totalAmountCents > 0) {
+        const invoiceNumber = `OCC-${new Date().toISOString().slice(0, 10)}-${runId.slice(0, 8).toUpperCase()}`;
+        const dueDate = new Date(periodEnd);
+        dueDate.setDate(dueDate.getDate() + 30);
+
+        const [invoice] = await tx
+          .insert(invoices)
+          .values({
+            tenantId,
+            invoiceNumber,
+            customerId,
+            status: 'draft',
+            totalAmount: totalAmountCents,
+            taxAmount: 0,
+            dueDate,
+            notes: `OCC usage-based billing for ${periodStart} to ${periodEnd}`,
+            createdBy,
+          })
+          .returning({ id: invoices.id });
+
+        invoiceId = invoice.id;
+
+        if (lines.length > 0) {
+          await tx.insert(invoiceLines).values(
+            lines.map((line, idx) => ({
+              tenantId,
+              invoiceId: invoiceId as string,
+              lineNumber: idx + 1,
+              description: line.description,
+              quantity: 1,
+              unitPrice: line.totalAmountCents,
+              amount: line.totalAmountCents,
+            })),
+          );
+        }
+      }
+
+      // Mark run complete with final totals
+      await tx
+        .update(occPullRuns)
+        .set({
+          status: 'complete',
+          rawUsage: usage,
+          usageSummary,
+          totalAmountCents,
+          invoiceId,
+          completedAt: new Date(),
+        })
+        .where(eq(occPullRuns.id, runId));
+
+      return { runId, invoiceId };
+    });
+
+    // Surface the original API/rating error after recording the failed run
+    if (runFailed) {
+      const originalError = !usageResult.ok
+        ? usageResult.error
+        : (ratingResult as { ok: false; error: AppError }).error;
+      return err(originalError);
+    }
+
+    return ok(result);
+  } catch (e) {
+    return err({ code: 'INTERNAL', message: `pullAndInvoice transaction failed: ${String(e)}` });
+  }
+}
+
+// ── Rate Card Management ───────────────────────────────────────────
+
+export interface CreateRateCardInput {
+  name: string;
+  meterType: string;
+  unitPriceCents: number;
+  currency?: string;
+  description?: string;
+}
+
+export interface UpdateRateCardInput {
+  name?: string;
+  unitPriceCents?: number;
+  currency?: string;
+  description?: string;
+  isActive?: boolean;
+}
+
+/** Create a rate card for a tenant. */
+export async function createRateCard(
+  tenantId: string,
+  input: CreateRateCardInput,
+  createdBy: string,
+): Promise<Result<RateCard, AppError>> {
+  const [row] = await db
+    .insert(occRateCards)
     .values({
       tenantId,
-      integrationConfigId: configId,
-      periodStart: new Date(periodStart),
-      periodEnd: new Date(periodEnd),
-      status: 'running',
+      name: input.name,
+      meterType: input.meterType,
+      unitPriceCents: input.unitPriceCents,
+      currency: input.currency ?? 'USD',
+      description: input.description ?? null,
       createdBy,
     })
-    .returning({ id: occPullRuns.id });
+    .returning();
+  return ok(row as RateCard);
+}
 
-  const runId = run.id;
-
-  // 3. Fetch usage from OCC
-  const usageResult = await fetchOccUsage(config, periodStart, periodEnd);
-  if (!usageResult.ok) {
-    await db
-      .update(occPullRuns)
-      .set({
-        status: 'failed',
-        errorMessage: usageResult.error.message,
-        completedAt: new Date(),
-      })
-      .where(eq(occPullRuns.id, runId));
-    return usageResult;
-  }
-
-  const usage = usageResult.value;
-
-  // 4. Rate the usage against local rate cards
-  const ratingResult = await rateUsage(tenantId, usage.meters);
-  if (!ratingResult.ok) {
-    await db
-      .update(occPullRuns)
-      .set({
-        status: 'failed',
-        errorMessage: ratingResult.error.message,
-        rawUsage: usage,
-        completedAt: new Date(),
-      })
-      .where(eq(occPullRuns.id, runId));
-    return ratingResult;
-  }
-
-  const { lines, totalAmountCents } = ratingResult.value;
-
-  // Build usage summary: meterType -> quantity
-  const usageSummary: Record<string, number> = {};
-  for (const line of lines) {
-    usageSummary[line.meterType] = line.quantity;
-  }
-
-  // 5. Write usage lines
-  if (lines.length > 0) {
-    await db.insert(occUsageLines).values(
-      lines.map((line) => ({
-        tenantId,
-        pullRunId: runId,
-        meterType: line.meterType,
-        rateCardId: line.rateCardId ?? undefined,
-        quantity: String(line.quantity),
-        unitPriceCents: line.unitPriceCents,
-        totalAmountCents: line.totalAmountCents,
-        description: line.description,
-      })),
-    );
-  }
-
-  // 6. Create invoice if there is a customer and non-zero amount
-  let invoiceId: string | null = null;
-  if (customerId && totalAmountCents > 0) {
-    const invoiceNumber = `OCC-${new Date().toISOString().slice(0, 10)}-${runId.slice(0, 8).toUpperCase()}`;
-    const dueDate = new Date(periodEnd);
-    dueDate.setDate(dueDate.getDate() + 30);
-
-    const [invoice] = await db
-      .insert(invoices)
-      .values({
-        tenantId,
-        invoiceNumber,
-        customerId,
-        status: 'draft',
-        totalAmount: totalAmountCents,
-        taxAmount: 0,
-        dueDate,
-        notes: `OCC usage-based billing for ${periodStart} to ${periodEnd}`,
-        createdBy,
-      })
-      .returning({ id: invoices.id });
-
-    invoiceId = invoice.id;
-
-    // Insert invoice lines
-    if (lines.length > 0) {
-      await db.insert(invoiceLines).values(
-        lines.map((line, idx) => ({
-          tenantId,
-          invoiceId: invoiceId as string,
-          lineNumber: idx + 1,
-          description: line.description,
-          quantity: 1,
-          unitPrice: line.totalAmountCents,
-          amount: line.totalAmountCents,
-        })),
-      );
-    }
-  }
-
-  // 7. Mark run complete
-  await db
-    .update(occPullRuns)
+/** Update a rate card. */
+export async function updateRateCard(
+  tenantId: string,
+  id: string,
+  input: UpdateRateCardInput,
+): Promise<Result<RateCard, AppError>> {
+  const rows = await db
+    .update(occRateCards)
     .set({
-      status: 'complete',
-      rawUsage: usage,
-      usageSummary,
-      totalAmountCents,
-      invoiceId,
-      completedAt: new Date(),
+      ...(input.name !== undefined && { name: input.name }),
+      ...(input.unitPriceCents !== undefined && { unitPriceCents: input.unitPriceCents }),
+      ...(input.currency !== undefined && { currency: input.currency }),
+      ...(input.description !== undefined && { description: input.description }),
+      ...(input.isActive !== undefined && { isActive: input.isActive }),
+      updatedAt: new Date(),
     })
-    .where(eq(occPullRuns.id, runId));
+    .where(and(eq(occRateCards.id, id), eq(occRateCards.tenantId, tenantId)))
+    .returning();
 
-  return ok({ runId, invoiceId });
+  if (rows.length === 0) {
+    return err({ code: 'NOT_FOUND', message: 'Rate card not found' });
+  }
+  return ok(rows[0] as RateCard);
+}
+
+/** Soft-delete a rate card (sets is_active = false). */
+export async function deleteRateCard(
+  tenantId: string,
+  id: string,
+): Promise<Result<void, AppError>> {
+  const rows = await db
+    .update(occRateCards)
+    .set({ isActive: false, updatedAt: new Date() })
+    .where(and(eq(occRateCards.id, id), eq(occRateCards.tenantId, tenantId)))
+    .returning({ id: occRateCards.id });
+
+  if (rows.length === 0) {
+    return err({ code: 'NOT_FOUND', message: 'Rate card not found' });
+  }
+  return ok(undefined);
 }
