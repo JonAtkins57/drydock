@@ -112,7 +112,11 @@ const SECTIONS: NavSection[] = [
     label: 'Project Management',
     items: [
       { label: 'Projects', path: '/project-management' },
+    ],
+  },
+  {
     label: 'Analytics',
+    items: [
       { label: 'KPI Dashboards', path: '/kpi-dashboards' },
     ],
   },
@@ -123,15 +127,9 @@ const SECTIONS: NavSection[] = [
     ],
   },
   {
-    label: 'Project Management',
+    label: 'Pricing',
     items: [
-      { label: 'Projects', path: '/project-management' },
-    ],
-  },
-  {
-    label: 'Analytics',
-    items: [
-      { label: 'KPI Dashboards', path: '/kpi-dashboards' },
+      { label: 'Rate Cards', path: '/pricing/rate-cards' },
     ],
   },
   {

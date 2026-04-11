@@ -36,17 +36,13 @@ import BalanceSheetRollForward from './pages/reports/BalanceSheetRollForward';
 import LeaseContracts from './pages/LeaseContracts';
 import WorkOrders from './pages/WorkOrders';
 import Budgets from './pages/Budgets';
-<<<<<<< HEAD
-import Inventory from './pages/Inventory';
 import ProjectManagement from './pages/ProjectManagement';
 import KpiDashboards from './pages/KpiDashboards';
 import ApAutoCodingMetrics from './pages/ApAutoCodingMetrics';
 import CashForecast from './pages/CashForecast';
 import OccBilling from './pages/OccBilling';
 import { Warehouses, InventoryItemsPage, InventoryTransactionsPage } from './pages/Inventory';
-=======
 import PricingRateCards from './pages/PricingRateCards';
->>>>>>> origin/shipyard/DD-53/dd-53-pricing-rate-cards-maste
 
 export default function App() {
   const { init, token } = useAuth();
@@ -94,8 +90,6 @@ export default function App() {
       <Route path="/assets" element={<FixedAssets />} />
       <Route path="/work-orders" element={<WorkOrders />} />
       <Route path="/budgets" element={<Budgets />} />
-<<<<<<< HEAD
-      <Route path="/inventory" element={<Inventory />} />
       <Route path="/project-management" element={<ProjectManagement />} />
       <Route path="/kpi-dashboards" element={<KpiDashboards />} />
       <Route path="/ap/auto-coding-metrics" element={<ApAutoCodingMetrics />} />
@@ -104,9 +98,7 @@ export default function App() {
       <Route path="/warehouses" element={<Warehouses />} />
       <Route path="/inventory-items" element={<InventoryItemsPage />} />
       <Route path="/inventory-transactions" element={<InventoryTransactionsPage />} />
-=======
       <Route path="/pricing/rate-cards" element={<PricingRateCards />} />
->>>>>>> origin/shipyard/DD-53/dd-53-pricing-rate-cards-maste
       <Route path="/" element={token ? <Navigate to="/dashboard" /> : <Landing />} />
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>
