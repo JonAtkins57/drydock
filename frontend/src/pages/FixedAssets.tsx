@@ -490,6 +490,211 @@ export default function FixedAssets() {
           </div>
         )}
 
+        {/* Books Modal */}
+        {selectedAssetId !== null && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/60" onClick={() => { setSelectedAssetId(null); setSelectedAsset(null); }} />
+            <div className="relative bg-drydock-card border border-drydock-border rounded-lg p-6 w-full max-w-4xl shadow-2xl">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h2 className="text-lg font-medium text-drydock-text">
+                    Depreciation Books
+                    {selectedAsset && (
+                      <span className="text-drydock-steel font-normal ml-2">
+                        {selectedAsset.assetNumber} — {selectedAsset.name}
+                      </span>
+                    )}
+                  </h2>
+                </div>
+                <div className="flex items-center gap-3">
+                  <select
+                    value={booksBookType}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setBooksBookType(val);
+                      if (selectedAsset) loadBooks(selectedAsset, val || undefined);
+                    }}
+                    className="px-3 py-1.5 bg-drydock-bg border border-drydock-border rounded-md text-sm text-drydock-text focus:outline-none focus:border-drydock-accent"
+                  >
+                    <option value="">All</option>
+                    <option value="gaap">GAAP</option>
+                    <option value="tax">Tax</option>
+                    <option value="internal">Internal</option>
+                  </select>
+                  <button
+                    onClick={() => { setSelectedAssetId(null); setSelectedAsset(null); }}
+                    className="px-3 py-1.5 text-sm text-drydock-steel border border-drydock-border rounded-md hover:text-drydock-text transition-colors"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+              {selectedAsset && (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-drydock-border">
+                        <th className="text-left px-4 py-2 text-xs text-drydock-steel uppercase tracking-wider font-medium">Period Date</th>
+                        <th className="text-left px-4 py-2 text-xs text-drydock-steel uppercase tracking-wider font-medium">Book Type</th>
+                        <th className="text-right px-4 py-2 text-xs text-drydock-steel uppercase tracking-wider font-medium">Beg. Book Value</th>
+                        <th className="text-right px-4 py-2 text-xs text-drydock-steel uppercase tracking-wider font-medium">Dep. Expense</th>
+                        <th className="text-right px-4 py-2 text-xs text-drydock-steel uppercase tracking-wider font-medium">Accum. Dep.</th>
+                        <th className="text-right px-4 py-2 text-xs text-drydock-steel uppercase tracking-wider font-medium">End. Book Value</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {booksLoading ? (
+                        <tr className="border-b border-drydock-border/50">
+                          {Array.from({ length: 6 }).map((_, j) => (
+                            <td key={j} className="px-4 py-3">
+                              <div className="h-4 bg-drydock-border/30 rounded animate-pulse w-24" />
+                            </td>
+                          ))}
+                        </tr>
+                      ) : books.length === 0 ? (
+                        <tr>
+                          <td colSpan={6} className="px-4 py-8 text-center text-drydock-steel">No depreciation entries</td>
+                        </tr>
+                      ) : (
+                        books.map((entry) => (
+                          <tr key={entry.id} className="border-b border-drydock-border/50 hover:bg-drydock-bg/50 transition-colors">
+                            <td className="px-4 py-3 text-sm text-drydock-steel">
+                              {new Date(entry.periodDate).toLocaleDateString()}
+                            </td>
+                            <td className="px-4 py-3 text-sm text-drydock-steel uppercase">{entry.bookType}</td>
+                            <td className="px-4 py-3 text-sm font-mono text-drydock-text text-right">{fmtDollars(entry.beginningBookValue)}</td>
+                            <td className="px-4 py-3 text-sm font-mono text-drydock-text text-right">{fmtDollars(entry.depreciationExpense)}</td>
+                            <td className="px-4 py-3 text-sm font-mono text-drydock-steel text-right">{fmtDollars(entry.accumulatedDepreciation)}</td>
+                            <td className="px-4 py-3 text-sm font-mono text-drydock-text text-right">{fmtDollars(entry.endingBookValue)}</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Roll-Forward Modal */}
+        {showRollForward && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/60" onClick={() => setShowRollForward(false)} />
+            <div className="relative bg-drydock-card border border-drydock-border rounded-lg p-6 w-full max-w-5xl shadow-2xl">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-medium text-drydock-text">Fixed Asset Roll-Forward</h2>
+                <button
+                  onClick={() => setShowRollForward(false)}
+                  className="px-3 py-1.5 text-sm text-drydock-steel border border-drydock-border rounded-md hover:text-drydock-text transition-colors"
+                >
+                  Close
+                </button>
+              </div>
+
+              <form onSubmit={handleRollForward} className="flex flex-wrap items-end gap-4 mb-4">
+                <div>
+                  <label className="block text-xs text-drydock-text-dim mb-1">From</label>
+                  <input
+                    type="date"
+                    value={rfFrom}
+                    onChange={(e) => setRfFrom(e.target.value)}
+                    required
+                    className="px-3 py-2 bg-drydock-bg border border-drydock-border rounded-md text-sm text-drydock-text focus:outline-none focus:border-drydock-accent"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-drydock-text-dim mb-1">To</label>
+                  <input
+                    type="date"
+                    value={rfTo}
+                    onChange={(e) => setRfTo(e.target.value)}
+                    required
+                    className="px-3 py-2 bg-drydock-bg border border-drydock-border rounded-md text-sm text-drydock-text focus:outline-none focus:border-drydock-accent"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-drydock-text-dim mb-1">Book Type</label>
+                  <select
+                    value={rfBookType}
+                    onChange={(e) => setRfBookType(e.target.value)}
+                    className="px-3 py-2 bg-drydock-bg border border-drydock-border rounded-md text-sm text-drydock-text focus:outline-none focus:border-drydock-accent"
+                  >
+                    <option value="">All</option>
+                    <option value="gaap">GAAP</option>
+                    <option value="tax">Tax</option>
+                    <option value="internal">Internal</option>
+                  </select>
+                </div>
+                <button
+                  type="submit"
+                  disabled={!rfFrom || !rfTo || rfFrom > rfTo || rfLoading}
+                  className="px-4 py-2 text-sm bg-drydock-accent hover:bg-drydock-accent-dim text-drydock-dark font-medium rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {rfLoading ? 'Loading...' : 'Run'}
+                </button>
+              </form>
+
+              {rfFrom && rfTo && rfFrom > rfTo && (
+                <div className="mb-4 p-3 rounded bg-red-900/30 border border-red-700/50 text-red-300 text-sm">
+                  From date must be on or before To date.
+                </div>
+              )}
+
+              {rfError && (
+                <div className="mb-4 p-3 rounded bg-red-900/30 border border-red-700/50 text-red-300 text-sm">{rfError}</div>
+              )}
+
+              {(rfLoading || rfData.length > 0) && (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-drydock-border">
+                        <th className="text-left px-4 py-2 text-xs text-drydock-steel uppercase tracking-wider font-medium">Asset #</th>
+                        <th className="text-left px-4 py-2 text-xs text-drydock-steel uppercase tracking-wider font-medium">Name</th>
+                        <th className="text-left px-4 py-2 text-xs text-drydock-steel uppercase tracking-wider font-medium">Class</th>
+                        <th className="text-left px-4 py-2 text-xs text-drydock-steel uppercase tracking-wider font-medium">Status</th>
+                        <th className="text-right px-4 py-2 text-xs text-drydock-steel uppercase tracking-wider font-medium">Acq. Cost</th>
+                        <th className="text-right px-4 py-2 text-xs text-drydock-steel uppercase tracking-wider font-medium">Beg. NBV</th>
+                        <th className="text-right px-4 py-2 text-xs text-drydock-steel uppercase tracking-wider font-medium">Total Dep. Expense</th>
+                        <th className="text-right px-4 py-2 text-xs text-drydock-steel uppercase tracking-wider font-medium">End. NBV</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rfLoading ? (
+                        <tr className="border-b border-drydock-border/50">
+                          {Array.from({ length: 8 }).map((_, j) => (
+                            <td key={j} className="px-4 py-3">
+                              <div className="h-4 bg-drydock-border/30 rounded animate-pulse w-24" />
+                            </td>
+                          ))}
+                        </tr>
+                      ) : (
+                        rfData.map((row) => (
+                          <tr key={row.assetId} className="border-b border-drydock-border/50 hover:bg-drydock-bg/50 transition-colors">
+                            <td className="px-4 py-3 text-sm font-mono text-drydock-accent">{row.assetNumber}</td>
+                            <td className="px-4 py-3 text-sm text-drydock-text">{row.name}</td>
+                            <td className="px-4 py-3 text-sm text-drydock-steel capitalize">{row.assetClass.replace('_', ' ')}</td>
+                            <td className="px-4 py-3 text-sm text-drydock-steel capitalize">{row.status.replace('_', ' ')}</td>
+                            <td className="px-4 py-3 text-sm font-mono text-drydock-text text-right">{fmtDollars(row.acquisitionCost)}</td>
+                            <td className="px-4 py-3 text-sm font-mono text-drydock-text text-right">
+                              {row.beginningNetBookValue !== null ? fmtDollars(row.beginningNetBookValue) : '—'}
+                            </td>
+                            <td className="px-4 py-3 text-sm font-mono text-drydock-text text-right">{fmtDollars(row.totalDepreciationExpense)}</td>
+                            <td className="px-4 py-3 text-sm font-mono text-drydock-text text-right">
+                              {row.endingNetBookValue !== null ? fmtDollars(row.endingNetBookValue) : '—'}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Table */}
         <div className="bg-drydock-card border border-drydock-border rounded-lg overflow-hidden">
           <table className="w-full">
@@ -563,6 +768,12 @@ export default function FixedAssets() {
                             Dispose
                           </button>
                         )}
+                        <button
+                          onClick={() => { setBooksBookType(''); loadBooks(asset); }}
+                          className="px-2 py-1 text-xs bg-drydock-card hover:bg-drydock-border/40 text-drydock-steel border border-drydock-border rounded transition-colors"
+                        >
+                          Books
+                        </button>
                       </div>
                     </td>
                   </tr>
