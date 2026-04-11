@@ -87,6 +87,12 @@ const SECTIONS: NavSection[] = [
     ],
   },
   {
+    label: 'Operations',
+    items: [
+      { label: 'Work Orders', path: '/work-orders' },
+    ],
+  },
+  {
     label: 'Settings',
     items: [
       { label: 'Custom Fields', path: '/custom-fields' },

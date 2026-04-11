@@ -28,6 +28,7 @@ import { validateDocuSignHmac } from './integration/docusign.js';
 import { setupRecurringWorker } from './gl/recurring.worker.js';
 import { leaseRoutes } from './lease/lease.routes.js';
 import { assetRoutes } from './asset/asset.routes.js';
+import { workOrderRoutes } from './work-orders/work-orders.routes.js';
 import type { AppErrorCode } from './lib/result.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -124,6 +125,7 @@ async function buildServer() {
   await fastify.register(attachmentRoutes);
   await fastify.register(leaseRoutes, { prefix: '/api/v1/leases' });
   await fastify.register(assetRoutes, { prefix: '/api/v1/assets' });
+  await fastify.register(workOrderRoutes, { prefix: '/api/v1/work-orders' });
 
   // ── DocuSign Connect Webhook ──────────────────────────────────────
   // Encapsulated scope so the buffer content-type parser only applies here.
