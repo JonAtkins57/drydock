@@ -8,3 +8,4 @@ export * from './q2c.js';
 export * from './p2p.js';
 export * from './ap.js';
 export * from '../../q2c/rev-rec.schema.js';
+export * from './lease.js';

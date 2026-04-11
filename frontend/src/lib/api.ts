@@ -267,6 +267,13 @@ export const endpoints = {
     ),
   createBillingPlan: (data: unknown) => api('/billing-plans', { method: 'POST', body: data }),
 
+  // Lease Accounting (ASC 842)
+  leases: (page = 1, pageSize = 50) =>
+    api<{ data: unknown[]; meta: { total: number; page: number; pageSize: number; totalPages: number } }>(
+      `/leases?page=${page}&pageSize=${pageSize}`
+    ),
+  createLease: (data: unknown) => api('/leases', { method: 'POST', body: data }),
+
   // Attachments
   listAttachments: (entityType: string, entityId: string): Promise<AttachmentRow[]> => {
     const token = localStorage.getItem('drydock_token');
