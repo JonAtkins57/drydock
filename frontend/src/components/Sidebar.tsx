@@ -99,6 +99,12 @@ const SECTIONS: NavSection[] = [
     ],
   },
   {
+    label: 'Pricing',
+    items: [
+      { label: 'Rate Cards', path: '/pricing/rate-cards' },
+    ],
+  },
+  {
     label: 'Settings',
     items: [
       { label: 'Custom Fields', path: '/custom-fields' },
