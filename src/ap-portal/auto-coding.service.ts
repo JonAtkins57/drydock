@@ -126,8 +126,8 @@ export async function getSuggestions(
       rank: idx + 1,
     }));
 
-    // Cold-start fallback: fill remaining slots from coding_rules
-    if (suggestions.length < 3) {
+    // Cold-start fallback: only when no feedback at all (pure cold-start)
+    if (feedbackRows.length === 0) {
       const existingIds = suggestions.map((s) => s.accountId);
       const needed = 3 - suggestions.length;
       const excludeClause = existingIds.length > 0
