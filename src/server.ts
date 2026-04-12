@@ -30,6 +30,7 @@ import { processWebhookEvent } from './q2c/docusign.service.js';
 import { validateDocuSignHmac } from './integration/docusign.js';
 import { loadWebhookConfig, processJiraWebhook } from './integration/jira.service.js';
 import { setupRecurringWorker } from './gl/recurring.worker.js';
+import { setupApWorkers } from './ap-portal/workers.js';
 import { leaseRoutes } from './lease/lease.routes.js';
 import { assetRoutes } from './asset/asset.routes.js';
 import { workOrderRoutes } from './work-orders/work-orders.routes.js';
@@ -340,6 +341,9 @@ async function start() {
     fastify.log.info(`Server listening on ${HOST}:${PORT}`);
     setupRecurringWorker(process.env.REDIS_URL ?? '').catch((err) => {
       fastify.log.error({ err }, '[recurring-worker] Failed to start');
+    });
+    setupApWorkers(process.env.REDIS_URL ?? '').catch((err) => {
+      fastify.log.error({ err }, '[ap-workers] Failed to start');
     });
   } catch (err) {
     fastify.log.error(err);
