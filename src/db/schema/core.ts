@@ -299,3 +299,20 @@ export const attachments = coreSchema.table('attachments', {
   uploadedBy: uuid('uploaded_by'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+// ── API Keys ──────────────────────────────────────────────────────
+// Raw key is never stored. key_hash = SHA-256(rawKey) hex string.
+// A single key can be scoped to multiple tenants.
+
+export const apiKeys = coreSchema.table('api_keys', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  name: text('name').notNull(),
+  keyHash: text('key_hash').notNull().unique(),
+  tenantIds: uuid('tenant_ids').array().notNull().default([]),
+  isActive: boolean('is_active').notNull().default(true),
+  lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
+  expiresAt: timestamp('expires_at', { withTimezone: true }),
+  createdBy: uuid('created_by'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});

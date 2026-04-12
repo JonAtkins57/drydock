@@ -49,6 +49,8 @@ import { documentTemplateRoutes } from './core/document-templates.routes.js';
 import { sodRulesRoutes } from './core/sod-rules.routes.js';
 import { auditRoutes } from './core/audit.routes.js';
 import { allocationRoutes } from './ap-portal/allocations.routes.js';
+import { apiKeyRoutes } from './core/api-keys.routes.js';
+import { apiKeyMiddleware } from './core/api-key.middleware.js';
 import type { AppErrorCode } from './lib/result.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -90,6 +92,11 @@ async function buildServer() {
             scheme: 'bearer',
             bearerFormat: 'JWT',
           },
+          apiKeyAuth: {
+            type: 'apiKey',
+            in: 'header',
+            name: 'X-API-Key',
+          },
         },
       },
     },
@@ -98,6 +105,9 @@ async function buildServer() {
   await fastify.register(fastifySwaggerUi, {
     routePrefix: '/docs',
   });
+
+  // ── API Key auth (global preHandler — public routes are excluded inside) ──
+  fastify.addHook('preHandler', apiKeyMiddleware);
 
   // ── Health check ──────────────────────────────────────────────────
   fastify.get('/api/v1/health', async (_request, reply) => {
@@ -164,6 +174,7 @@ async function buildServer() {
   await fastify.register(sodRulesRoutes, { prefix: '/api/v1/sod-rules' });
   await fastify.register(auditRoutes, { prefix: '/api/v1/audit-logs' });
   await fastify.register(allocationRoutes, { prefix: '/api/v1/ap/invoices' });
+  await fastify.register(apiKeyRoutes, { prefix: '/api/v1/api-keys' });
 
   // ── DocuSign Connect Webhook ──────────────────────────────────────
   // Encapsulated scope so the buffer content-type parser only applies here.
