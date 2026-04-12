@@ -9,6 +9,10 @@ export const budgetScenarioEnum = planningSchema.enum('budget_scenario', [
   'base', 'optimistic', 'pessimistic',
 ]);
 
+export const budgetStatusEnum = planningSchema.enum('budget_status', [
+  'draft', 'pending_approval', 'approved', 'rejected', 'voided',
+]);
+
 // ── Annual Budgets ─────────────────────────────────────────────────
 
 export const annualBudgets = planningSchema.table('annual_budgets', {
@@ -17,11 +21,16 @@ export const annualBudgets = planningSchema.table('annual_budgets', {
   fiscalYear: integer('fiscal_year').notNull(),
   name: text('name').notNull(),
   scenario: budgetScenarioEnum('scenario').notNull().default('base'),
+  status: budgetStatusEnum('status').notNull().default('draft'),
   notes: text('notes'),
   isActive: boolean('is_active').notNull().default(true),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   createdBy: uuid('created_by'),
+  approvedBy: uuid('approved_by'),
+  approvedAt: timestamp('approved_at', { withTimezone: true }),
+  rejectedBy: uuid('rejected_by'),
+  rejectedAt: timestamp('rejected_at', { withTimezone: true }),
 });
 
 // ── Budget Lines ───────────────────────────────────────────────────

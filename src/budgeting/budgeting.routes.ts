@@ -3,7 +3,9 @@ import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { eq, desc, count, and, sql } from 'drizzle-orm';
 import { authenticateHook, setTenantContext } from '../core/auth.middleware.js';
 import { db } from '../db/connection.js';
-import { annualBudgets, budgetLines, forecasts } from '../db/schema/index.js';
+import { annualBudgets, budgetLines, forecasts, accountingPeriods } from '../db/schema/index.js';
+import { createJournalEntry } from '../gl/posting.service.js';
+import { logAction } from '../core/audit.service.js';
 
 // ── Schemas ────────────────────────────────────────────────────────
 
@@ -24,6 +26,11 @@ const createBudgetLineSchema = z.object({
   accountId: z.string().uuid(),
   amountCents: z.number().int().min(0),
   description: z.string().optional(),
+});
+
+const approveBodySchema = z.object({
+  periodId: z.string().uuid().nullish(),
+  budgetControlAccountId: z.string().uuid().nullish(),
 });
 
 // ── Plugin ─────────────────────────────────────────────────────────
@@ -258,5 +265,252 @@ export async function budgetingRoutes(fastify: FastifyInstance): Promise<void> {
       .header('Content-Type', 'text/csv')
       .header('Content-Disposition', `attachment; filename=budget-${id}.csv`)
       .send(csv);
+  });
+
+  // DELETE /:id — void (draft or rejected only)
+  fastify.delete('/:id', async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    const { tenantId, sub: userId } = request.currentUser;
+    const { id } = request.params;
+
+    const [budget] = await db
+      .select()
+      .from(annualBudgets)
+      .where(and(eq(annualBudgets.id, id), eq(annualBudgets.tenantId, tenantId)));
+
+    if (!budget) {
+      return reply.status(404).send({ error: 'NOT_FOUND', message: 'Budget not found' });
+    }
+
+    if (budget.status !== 'draft' && budget.status !== 'rejected') {
+      return reply.status(422).send({
+        error: 'VALIDATION',
+        message: 'Only draft or rejected budgets can be voided',
+      });
+    }
+
+    await db
+      .update(annualBudgets)
+      .set({ status: 'voided', updatedAt: new Date() })
+      .where(and(eq(annualBudgets.id, id), eq(annualBudgets.tenantId, tenantId)));
+
+    await logAction({
+      tenantId,
+      userId,
+      action: 'void',
+      entityType: 'annual_budget',
+      entityId: id,
+      changes: { from: budget.status, to: 'voided' },
+    });
+
+    return reply.status(204).send();
+  });
+
+  // POST /:id/actions/submit — draft → pending_approval
+  fastify.post('/:id/actions/submit', async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    const { tenantId, sub: userId } = request.currentUser;
+    const { id } = request.params;
+
+    const [budget] = await db
+      .select()
+      .from(annualBudgets)
+      .where(and(eq(annualBudgets.id, id), eq(annualBudgets.tenantId, tenantId)));
+
+    if (!budget) {
+      return reply.status(404).send({ error: 'NOT_FOUND', message: 'Budget not found' });
+    }
+
+    if (budget.status !== 'draft') {
+      return reply.status(422).send({
+        error: 'VALIDATION',
+        message: 'Budget must be in draft status to submit',
+      });
+    }
+
+    const [updated] = await db
+      .update(annualBudgets)
+      .set({ status: 'pending_approval', updatedAt: new Date() })
+      .where(and(eq(annualBudgets.id, id), eq(annualBudgets.tenantId, tenantId)))
+      .returning();
+
+    await logAction({
+      tenantId,
+      userId,
+      action: 'submit',
+      entityType: 'annual_budget',
+      entityId: id,
+      changes: { from: 'draft', to: 'pending_approval' },
+    });
+
+    return reply.send(updated);
+  });
+
+  // POST /:id/actions/approve — pending_approval → approved (with optional GL posting)
+  fastify.post('/:id/actions/approve', async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    const { tenantId, sub: userId } = request.currentUser;
+    const { id } = request.params;
+
+    const bodyParsed = approveBodySchema.safeParse(request.body ?? {});
+    if (!bodyParsed.success) {
+      return reply.status(422).send({
+        error: 'VALIDATION',
+        message: 'Invalid request body',
+        details: bodyParsed.error.flatten().fieldErrors,
+      });
+    }
+    const { periodId: bodyPeriodId, budgetControlAccountId } = bodyParsed.data;
+
+    const [budget] = await db
+      .select()
+      .from(annualBudgets)
+      .where(and(eq(annualBudgets.id, id), eq(annualBudgets.tenantId, tenantId)));
+
+    if (!budget) {
+      return reply.status(404).send({ error: 'NOT_FOUND', message: 'Budget not found' });
+    }
+
+    if (budget.status !== 'pending_approval') {
+      return reply.status(422).send({
+        error: 'VALIDATION',
+        message: 'Budget must be in pending_approval status to approve',
+      });
+    }
+
+    const now = new Date();
+    let journalEntryId: string | undefined;
+
+    // Post GL if account mapping is provided (periodId + budgetControlAccountId)
+    if (budgetControlAccountId) {
+      // Resolve period
+      let periodId: string;
+      if (bodyPeriodId) {
+        const [period] = await db
+          .select()
+          .from(accountingPeriods)
+          .where(
+            and(
+              eq(accountingPeriods.id, bodyPeriodId),
+              eq(accountingPeriods.tenantId, tenantId),
+              eq(accountingPeriods.status, 'open'),
+            ),
+          )
+          .limit(1);
+        if (!period) {
+          return reply.status(422).send({ error: 'VALIDATION', message: 'Supplied period not found or not open' });
+        }
+        periodId = period.id;
+      } else {
+        const [openPeriod] = await db
+          .select()
+          .from(accountingPeriods)
+          .where(and(eq(accountingPeriods.tenantId, tenantId), eq(accountingPeriods.status, 'open')))
+          .orderBy(desc(accountingPeriods.startDate))
+          .limit(1);
+        if (!openPeriod) {
+          return reply.status(422).send({ error: 'VALIDATION', message: 'No open accounting period' });
+        }
+        periodId = openPeriod.id;
+      }
+
+      const lines = await db
+        .select()
+        .from(budgetLines)
+        .where(and(eq(budgetLines.budgetId, id), eq(budgetLines.tenantId, tenantId)));
+
+      if (lines.length > 0) {
+        const totalCents = lines.reduce((sum, l) => sum + l.amountCents, 0);
+        const glLines = [
+          // Debit each expense account per budget line
+          ...lines.map((line) => ({
+            accountId: line.accountId,
+            debitAmount: line.amountCents,
+            creditAmount: 0,
+            description: line.description ?? undefined,
+          })),
+          // Credit the budget control account for the total
+          {
+            accountId: budgetControlAccountId,
+            debitAmount: 0,
+            creditAmount: totalCents,
+            description: `Budget approval: ${budget.name}`,
+          },
+        ];
+
+        const glResult = await createJournalEntry(
+          tenantId,
+          {
+            journalType: 'automated',
+            periodId,
+            postingDate: now.toISOString(),
+            sourceModule: 'budget',
+            sourceEntityType: 'annual_budget',
+            sourceEntityId: budget.id,
+            description: `Budget approved: ${budget.name} (${budget.fiscalYear})`,
+            lines: glLines,
+          },
+          userId,
+        );
+
+        if (!glResult.ok) {
+          return reply.status(500).send({ error: 'INTERNAL', message: 'GL posting failed', details: glResult.error });
+        }
+        journalEntryId = glResult.value.id;
+      }
+    }
+
+    const [updated] = await db
+      .update(annualBudgets)
+      .set({ status: 'approved', approvedBy: userId, approvedAt: now, updatedAt: now })
+      .where(and(eq(annualBudgets.id, id), eq(annualBudgets.tenantId, tenantId)))
+      .returning();
+
+    await logAction({
+      tenantId,
+      userId,
+      action: 'approve',
+      entityType: 'annual_budget',
+      entityId: id,
+      changes: { from: 'pending_approval', to: 'approved', ...(journalEntryId ? { journalEntryId } : {}) },
+    });
+
+    return reply.send(updated);
+  });
+
+  // POST /:id/actions/reject — pending_approval → rejected
+  fastify.post('/:id/actions/reject', async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    const { tenantId, sub: userId } = request.currentUser;
+    const { id } = request.params;
+
+    const [budget] = await db
+      .select()
+      .from(annualBudgets)
+      .where(and(eq(annualBudgets.id, id), eq(annualBudgets.tenantId, tenantId)));
+
+    if (!budget) {
+      return reply.status(404).send({ error: 'NOT_FOUND', message: 'Budget not found' });
+    }
+
+    if (budget.status !== 'pending_approval') {
+      return reply.status(422).send({
+        error: 'VALIDATION',
+        message: 'Budget must be in pending_approval status to reject',
+      });
+    }
+
+    const [updated] = await db
+      .update(annualBudgets)
+      .set({ status: 'rejected', rejectedBy: userId, rejectedAt: new Date(), updatedAt: new Date() })
+      .where(and(eq(annualBudgets.id, id), eq(annualBudgets.tenantId, tenantId)))
+      .returning();
+
+    await logAction({
+      tenantId,
+      userId,
+      action: 'reject',
+      entityType: 'annual_budget',
+      entityId: id,
+      changes: { from: 'pending_approval', to: 'rejected' },
+    });
+
+    return reply.send(updated);
   });
 }

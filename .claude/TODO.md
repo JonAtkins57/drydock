@@ -1,31 +1,27 @@
 # DryDock TODO
 
-## Phase 1 — COMPLETE
-All 26 Harbor tickets done. All 9 CLAUDE.md Phase 1 modules built with backend + frontend + tests. ✅
+## Phase 1 — COMPLETE ✅
+All 26 Harbor tickets done. All 9 CLAUDE.md Phase 1 modules built with backend + frontend + tests.
 
-## Remaining Polish / Debt
-- [ ] DocuSign integration for quote execution | P1 | added: 2026-01-15
-- [x] PDF generation via Puppeteer (quotes, invoices, POs) ✅
-- [x] Transaction-level email send + tracking ✅
-- [x] Import/export utilities for master data (customers, vendors, items, GL accounts) ✅
-- [x] P&L and Balance Sheet financial reports ✅
-- [x] Credit memos with approval workflow ✅
-- [ ] Real IMAP + Textract implementations (stubs exist) | P2 | added: 2026-01-15
-- [ ] Real S3 implementation (stub exists) | P2 | added: 2026-01-15
-- [x] Customer statement generation ✅
+## Phase 2 — COMPLETE ✅
+All Phase 2 items shipped (DD-27 through DD-54). All 54 Harbor tickets in `done` state.
 
-## P2 — Phase 2 Backlog
-- [ ] Learned auto-coding (ML on historical AP coding)
-- [ ] Expense amortization + allocation engine
-- [ ] Revenue recognition (ASC 606)
-- [ ] Fixed asset management (drydock_asset)
-- [ ] Inventory management (drydock_inventory)
-- [ ] Project management (drydock_project)
-- [ ] Work order management
-- [ ] Lease accounting ASC 842 (drydock_lease)
-- [ ] Forecasting + budgeting (drydock_planning)
-- [ ] OCC usage-based billing integration
-- [ ] Concur integration
-- [ ] KPI dashboards + self-service reporting
-- [ ] JIRA integration expansion
-- [ ] Advanced workflow orchestration
+## Genuine Code Gaps — ALL RESOLVED ✅
+
+- ✅ `queueOcrJob()` already called in `intake.service.ts:119` (was stale TODO)
+- ✅ S3/Textract now per-tenant from `integration_configs` (type='aws'), global env as fallback — `workers.ts` 2026-04-12
+- ✅ IMAP per-tenant from `integration_configs` (type='imap') — already wired, merge conflict resolved 2026-04-12
+
+## Config / Ops (not code work)
+- [ ] Set `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `S3_BUCKET` in prod .env for real S3/Textract
+- [ ] Configure IMAP credentials per-tenant in integration_configs for real AP inbox polling
+- [ ] Configure Redis URL for BullMQ workers to actually run in production
+
+## Stale Items Cleared
+- DocuSign ✅ (DD-38 merged, wired into quotes + webhook handler in server.ts)
+- PDF generation ✅ (DD-39)
+- Real S3 implementation ✅ (DD-51 — real client in s3.client.ts, factory wired; stub is fallback)
+- Real Textract ✅ (DD — real client in ocr.worker.ts, uses AWS SDK; stubs only used if not configured)
+- Real IMAP ✅ (DD — imapflow + mailparser wired in imap.poller.ts; stub is fallback)
+- Concur integration ✅ (DD-40)
+- All Phase 2 backlog items ✅ (expense amortization, revenue rec, fixed assets, inventory, project mgmt, etc.)

@@ -48,3 +48,20 @@ Landing, Login, Dashboard, Customers, Vendors, GL Accounts, Periods, Leads, Oppo
 - Harbor as working truth for project status
 - SES from atkinsps AWS account
 - Stubs for IMAP/Textract/S3 (swappable interfaces)
+
+## Session 2026-04-12 — Concur Integration + Spec Gap Analysis
+
+### Done
+- Wired DD-40 Concur integration: migration `0022_concur_integration.sql`, `schema/index.ts` export, `server.ts` registration, `frontend/src/lib/api.ts` 8 new functions, `App.tsx` route, `Sidebar.tsx` nav entry, `ConcurIntegration.tsx` full page
+- Confirmed all 54 DD Harbor tickets are in `done` state (Shipyard webhooks kept them current)
+- Confirmed DB has 105 tables — fully migrated, not empty
+- Spec gap analysis: all Phase 1, 2, and 3 items from CLAUDE.md are implemented. Remaining work is wiring stubs to real implementations (S3/IMAP/Textract/BullMQ queue)
+- Updated TODO.md to reflect accurate state
+
+### Decisions Made
+- S3, Textract, and IMAP all have real implementations — stubs are just fallbacks for dev. Only gap is intake.service.ts:118 not calling queueOcrJob()
+
+### Risks/Debt Noted
+- `intake.service.ts:118`: BullMQ `queueOcrJob()` exists but is never called — OCR won't process on new invoice intake until wired
+- `workers.ts:76`: Always uses stub S3, even when AWS credentials are set — needs env check
+- `workers.ts:106`: Always uses stub IMAP client — needs IMAP config check at startup
