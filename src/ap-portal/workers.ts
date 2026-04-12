@@ -1,6 +1,6 @@
 import { processInboxEmails, createStubImapClient, type ImapClient } from './imap.poller.js';
 import { processOcrJob, createTextractClient, type OcrClient } from './ocr.worker.js';
-import { createStubS3Client, type S3Client } from './s3.client.js';
+import { createStubS3Client, createS3Client, type S3Client } from './s3.client.js';
 
 // ── Types ───────────────────────────────────────────────────────────
 
@@ -73,7 +73,15 @@ export async function setupApWorkers(
   redisUrl: string,
   context?: Partial<ApWorkerContext>,
 ): Promise<WorkerHandles> {
-  const s3Client = context?.s3Client ?? createStubS3Client();
+  const s3Client = context?.s3Client ?? (
+    process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY && process.env.AWS_REGION
+      ? createS3Client({
+          region: process.env.AWS_REGION,
+          accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+          secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+        })
+      : createStubS3Client()
+  );
   const ocrClient = context?.ocrClient ?? createTextractClient();
   const imapClients = context?.imapClients ?? new Map<string, ImapClient>();
 

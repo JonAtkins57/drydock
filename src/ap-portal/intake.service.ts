@@ -4,6 +4,7 @@ import { apInvoices, apInvoiceLines } from '../db/schema/index';
 import { ok, err, type Result, type AppError } from '../lib/result';
 import { logAction } from '../core/audit.service';
 import type { CreateManualInvoiceInput, CreateFromUploadInput } from './ap.schemas';
+import { queueOcrJob } from './workers.js';
 
 // ── Types ──────────────────────────────────────────────────────────
 
@@ -115,8 +116,7 @@ export async function createFromUpload(
     return err({ code: 'INTERNAL', message: 'Failed to create AP invoice from upload' });
   }
 
-  // TODO: Queue OCR job via BullMQ
-  // await ocrQueue.add('process-invoice', { tenantId, invoiceId: invoice.id });
+  await queueOcrJob(invoice.id, tenantId);
 
   await logAction({
     tenantId,
