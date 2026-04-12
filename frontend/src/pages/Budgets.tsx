@@ -9,6 +9,7 @@ interface Budget {
   fiscalYear: number;
   name: string;
   scenario: 'base' | 'optimistic' | 'pessimistic';
+  status: 'draft' | 'pending_approval' | 'approved' | 'rejected' | 'voided';
   notes: string | null;
   isActive: boolean;
   createdAt: string;
@@ -18,6 +19,14 @@ const SCENARIO_COLORS: Record<string, string> = {
   base: 'bg-blue-900/30 text-blue-400 border-blue-700/30',
   optimistic: 'bg-green-900/30 text-green-400 border-green-700/30',
   pessimistic: 'bg-red-900/30 text-red-400 border-red-700/30',
+};
+
+const STATUS_COLORS: Record<string, string> = {
+  draft: 'bg-gray-800 text-gray-400 border-gray-700/30',
+  pending_approval: 'bg-yellow-900/30 text-yellow-400 border-yellow-700/30',
+  approved: 'bg-green-900/30 text-green-400 border-green-700/30',
+  rejected: 'bg-red-900/30 text-red-400 border-red-700/30',
+  voided: 'bg-gray-900/30 text-gray-600 border-gray-800/30',
 };
 
 export default function Budgets() {
@@ -35,6 +44,7 @@ export default function Budgets() {
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) { navigate('/login'); return; }
@@ -71,6 +81,18 @@ export default function Budgets() {
       setFormError(err instanceof Error ? err.message : 'Failed to create budget');
     }
     setSubmitting(false);
+  };
+
+  const handleAction = async (id: string, action: 'submit' | 'approve' | 'reject' | 'void') => {
+    setActionLoading(`${id}-${action}`);
+    try {
+      if (action === 'submit') await endpoints.submitBudget(id);
+      else if (action === 'approve') await endpoints.approveBudget(id);
+      else if (action === 'reject') await endpoints.rejectBudget(id);
+      else await endpoints.voidBudget(id);
+      await load();
+    } catch { /* silently ignore — user sees stale state */ }
+    setActionLoading(null);
   };
 
   if (!user) return null;
@@ -191,37 +213,91 @@ export default function Budgets() {
                 <th className="text-left px-5 py-3 text-xs text-drydock-steel uppercase tracking-wider font-medium">Name</th>
                 <th className="text-left px-5 py-3 text-xs text-drydock-steel uppercase tracking-wider font-medium">Fiscal Year</th>
                 <th className="text-left px-5 py-3 text-xs text-drydock-steel uppercase tracking-wider font-medium">Scenario</th>
+                <th className="text-left px-5 py-3 text-xs text-drydock-steel uppercase tracking-wider font-medium">Status</th>
                 <th className="text-left px-5 py-3 text-xs text-drydock-steel uppercase tracking-wider font-medium">Notes</th>
                 <th className="text-left px-5 py-3 text-xs text-drydock-steel uppercase tracking-wider font-medium">Created</th>
+                <th className="text-left px-5 py-3 text-xs text-drydock-steel uppercase tracking-wider font-medium">Actions</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 Array.from({ length: 3 }).map((_, i) => (
                   <tr key={i} className="border-b border-drydock-border/50">
-                    {Array.from({ length: 5 }).map((_, j) => (
+                    {Array.from({ length: 7 }).map((_, j) => (
                       <td key={j} className="px-5 py-3"><div className="h-4 bg-drydock-border/30 rounded animate-pulse w-24" /></td>
                     ))}
                   </tr>
                 ))
               ) : items.length === 0 ? (
-                <tr><td colSpan={5} className="px-5 py-8 text-center text-drydock-steel">No budgets found</td></tr>
+                <tr><td colSpan={7} className="px-5 py-8 text-center text-drydock-steel">No budgets found</td></tr>
               ) : (
-                items.map((budget) => (
-                  <tr key={budget.id} className="border-b border-drydock-border/50 hover:bg-drydock-bg/50 transition-colors">
-                    <td className="px-5 py-3 text-sm text-drydock-text font-medium">{budget.name}</td>
-                    <td className="px-5 py-3 text-sm font-mono text-drydock-accent">{budget.fiscalYear}</td>
-                    <td className="px-5 py-3">
-                      <span className={`text-xs px-2 py-0.5 rounded-full border ${SCENARIO_COLORS[budget.scenario] ?? 'bg-gray-800 text-gray-400'}`}>
-                        {budget.scenario}
-                      </span>
-                    </td>
-                    <td className="px-5 py-3 text-sm text-drydock-steel max-w-xs truncate">{budget.notes ?? '—'}</td>
-                    <td className="px-5 py-3 text-sm text-drydock-steel">
-                      {new Date(budget.createdAt).toLocaleDateString()}
-                    </td>
-                  </tr>
-                ))
+                items.map((budget) => {
+                  const busy = (action: string) => actionLoading === `${budget.id}-${action}`;
+                  return (
+                    <tr key={budget.id} className="border-b border-drydock-border/50 hover:bg-drydock-bg/50 transition-colors">
+                      <td className="px-5 py-3 text-sm text-drydock-text font-medium">{budget.name}</td>
+                      <td className="px-5 py-3 text-sm font-mono text-drydock-accent">{budget.fiscalYear}</td>
+                      <td className="px-5 py-3">
+                        <span className={`text-xs px-2 py-0.5 rounded-full border ${SCENARIO_COLORS[budget.scenario] ?? 'bg-gray-800 text-gray-400'}`}>
+                          {budget.scenario}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3">
+                        <span className={`text-xs px-2 py-0.5 rounded-full border ${STATUS_COLORS[budget.status] ?? 'bg-gray-800 text-gray-400'}`}>
+                          {budget.status.replace('_', ' ')}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3 text-sm text-drydock-steel max-w-xs truncate">{budget.notes ?? '—'}</td>
+                      <td className="px-5 py-3 text-sm text-drydock-steel">
+                        {new Date(budget.createdAt).toLocaleDateString()}
+                      </td>
+                      <td className="px-5 py-3">
+                        <div className="flex gap-2">
+                          {budget.status === 'draft' && (
+                            <button
+                              onClick={() => handleAction(budget.id, 'submit')}
+                              disabled={!!actionLoading}
+                              className="text-xs px-2 py-1 rounded bg-yellow-900/30 text-yellow-400 border border-yellow-700/30
+                                hover:bg-yellow-900/50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            >
+                              {busy('submit') ? '…' : 'Submit'}
+                            </button>
+                          )}
+                          {budget.status === 'pending_approval' && (
+                            <>
+                              <button
+                                onClick={() => handleAction(budget.id, 'approve')}
+                                disabled={!!actionLoading}
+                                className="text-xs px-2 py-1 rounded bg-green-900/30 text-green-400 border border-green-700/30
+                                  hover:bg-green-900/50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                              >
+                                {busy('approve') ? '…' : 'Approve'}
+                              </button>
+                              <button
+                                onClick={() => handleAction(budget.id, 'reject')}
+                                disabled={!!actionLoading}
+                                className="text-xs px-2 py-1 rounded bg-red-900/30 text-red-400 border border-red-700/30
+                                  hover:bg-red-900/50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                              >
+                                {busy('reject') ? '…' : 'Reject'}
+                              </button>
+                            </>
+                          )}
+                          {(budget.status === 'draft' || budget.status === 'rejected') && (
+                            <button
+                              onClick={() => handleAction(budget.id, 'void')}
+                              disabled={!!actionLoading}
+                              className="text-xs px-2 py-1 rounded bg-gray-800 text-gray-500 border border-gray-700/30
+                                hover:text-gray-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            >
+                              {busy('void') ? '…' : 'Void'}
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>

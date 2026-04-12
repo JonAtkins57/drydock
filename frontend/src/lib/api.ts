@@ -338,6 +338,11 @@ export const endpoints = {
   getBudget: (id: string) => api(`/budgets/${id}`),
   addBudgetLine: (id: string, data: unknown) => api(`/budgets/${id}/lines`, { method: 'POST', body: data }),
   getBudgetVariance: (id: string) => api(`/budgets/${id}/variance`),
+  submitBudget: (id: string) => api(`/budgets/${id}/actions/submit`, { method: 'POST' }),
+  approveBudget: (id: string, data?: { periodId?: string; budgetControlAccountId?: string }) =>
+    api(`/budgets/${id}/actions/approve`, { method: 'POST', body: data ?? {} }),
+  rejectBudget: (id: string) => api(`/budgets/${id}/actions/reject`, { method: 'POST' }),
+  voidBudget: (id: string) => api(`/budgets/${id}`, { method: 'DELETE' }),
 
   // Cash Forecasts
   cashForecastRolling: () => api<{ data: unknown[] }>('/cash-forecasts/rolling'),
