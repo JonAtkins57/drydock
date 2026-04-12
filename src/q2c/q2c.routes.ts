@@ -1,10 +1,12 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
+import { z } from 'zod';
 import { eq, and, isNotNull } from 'drizzle-orm';
 import { authenticateHook, setTenantContext } from '../core/auth.middleware.js';
 import { quoteService } from './quotes.service.js';
 import { orderService } from './orders.service.js';
 import { invoiceService } from './invoices.service.js';
 import { billingService } from './billing.service.js';
+import * as billingAmendmentsService from './billing-amendments.service.js';
 import { creditMemoRoutes } from './credit-memos.routes.js';
 import { revRecRoutes } from './rev-rec.routes.js';
 import { statementService } from './statement.service.js';
@@ -566,6 +568,35 @@ async function billingPlanRoutes(fastify: FastifyInstance): Promise<void> {
     const result = await billingService.processScheduledBilling(tenantId);
     if (!result.ok) return sendError(reply, result.error);
     return reply.send(result.value);
+  });
+
+  // GET /:id/amendments — list amendments for a billing plan
+  fastify.get('/:id/amendments', async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    const { tenantId } = request.currentUser;
+    const result = await billingAmendmentsService.listAmendments(tenantId, request.params.id);
+    if (!result.ok) return sendError(reply, result.error);
+    return reply.send({ data: result.value });
+  });
+
+  // POST /:id/amend — create a billing plan amendment
+  fastify.post('/:id/amend', async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    const amendSchema = z.object({
+      effectiveDate: z.string().datetime(),
+      amendmentType: z.string().min(1).max(100),
+      changes: z.record(z.unknown()),
+      notes: z.string().optional(),
+    });
+    const parsed = amendSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(422).send({ error: 'VALIDATION', message: parsed.error.message });
+    }
+    const { tenantId, sub: userId } = request.currentUser;
+    const result = await billingAmendmentsService.createAmendment(tenantId, userId, request.params.id, {
+      ...parsed.data,
+      effectiveDate: new Date(parsed.data.effectiveDate),
+    });
+    if (!result.ok) return sendError(reply, result.error);
+    return reply.status(201).send(result.value);
   });
 }
 

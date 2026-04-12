@@ -43,6 +43,12 @@ import { dashboardRoutes } from './reports/dashboards.routes.js';
 import autoCodingRoutes from './ap-portal/auto-coding.routes.js';
 import { cashForecastRoutes } from './cash-forecast/cash-forecast.routes.js';
 import { pricingRoutes } from './pricing/pricing.routes.js';
+import { searchRoutes } from './search/search.routes.js';
+import { poMatchingRulesRoutes } from './p2p/po-matching-rules.routes.js';
+import { documentTemplateRoutes } from './core/document-templates.routes.js';
+import { sodRulesRoutes } from './core/sod-rules.routes.js';
+import { auditRoutes } from './core/audit.routes.js';
+import { allocationRoutes } from './ap-portal/allocations.routes.js';
 import type { AppErrorCode } from './lib/result.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -152,6 +158,12 @@ async function buildServer() {
   await fastify.register(autoCodingRoutes);
   await fastify.register(cashForecastRoutes, { prefix: '/api/v1/cash-forecasts' });
   await fastify.register(pricingRoutes, { prefix: '/api/v1/pricing' });
+  await fastify.register(searchRoutes, { prefix: '/api/v1/search' });
+  await fastify.register(poMatchingRulesRoutes, { prefix: '/api/v1/po-matching-rules' });
+  await fastify.register(documentTemplateRoutes, { prefix: '/api/v1/document-templates' });
+  await fastify.register(sodRulesRoutes, { prefix: '/api/v1/sod-rules' });
+  await fastify.register(auditRoutes, { prefix: '/api/v1/audit-logs' });
+  await fastify.register(allocationRoutes, { prefix: '/api/v1/ap/invoices' });
 
   // ── DocuSign Connect Webhook ──────────────────────────────────────
   // Encapsulated scope so the buffer content-type parser only applies here.

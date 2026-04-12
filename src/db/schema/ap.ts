@@ -127,6 +127,40 @@ export const amortizationScheduleLines = apSchema.table('amortization_schedule_l
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+// ── Duplicate Detections ─────────────────────────────────────────────
+
+export const duplicateDetections = apSchema.table('duplicate_detections', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  invoiceId: uuid('invoice_id').notNull().references(() => apInvoices.id),
+  matchedInvoiceId: uuid('matched_invoice_id').notNull().references(() => apInvoices.id),
+  matchScore: numeric('match_score', { precision: 5, scale: 4 }).notNull(),
+  matchReason: text('match_reason').notNull(),
+  status: text('status').notNull().default('pending'),
+  resolvedBy: uuid('resolved_by'),
+  resolvedAt: timestamp('resolved_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// ── AP Allocations ───────────────────────────────────────────────────
+
+export const apAllocations = apSchema.table('ap_allocations', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  invoiceId: uuid('invoice_id').notNull().references(() => apInvoices.id),
+  invoiceLineId: uuid('invoice_line_id').references(() => apInvoiceLines.id),
+  accountId: uuid('account_id').notNull().references(() => accounts.id),
+  departmentId: uuid('department_id').references(() => departments.id),
+  projectId: uuid('project_id').references(() => projects.id),
+  costCenterId: uuid('cost_center_id').references(() => costCenters.id),
+  amountCents: integer('amount_cents').notNull(),
+  allocationPct: numeric('allocation_pct', { precision: 7, scale: 4 }),
+  status: text('status').notNull().default('pending'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  createdBy: uuid('created_by'),
+});
+
 // ── PO Match Results ─────────────────────────────────────────────────
 
 export const poMatchResults = apSchema.table('po_match_results', {

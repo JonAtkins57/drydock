@@ -162,6 +162,7 @@ export const billingPlans = q2cSchema.table('billing_plans', {
   endDate: timestamp('end_date', { withTimezone: true }),
   status: billingPlanStatusEnum('status').notNull().default('active'),
   totalAmount: integer('total_amount').notNull().default(0),
+  version: integer('version').notNull().default(1),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   createdBy: uuid('created_by'),
@@ -242,6 +243,24 @@ export const creditMemoApplications = q2cSchema.table('credit_memo_applications'
   amount: integer('amount').notNull(),
   appliedAt: timestamp('applied_at', { withTimezone: true }).notNull().defaultNow(),
   appliedBy: uuid('applied_by').notNull(),
+});
+
+// ── Billing Plan Amendments ────────────────────────────────────────
+
+export const billingPlanAmendments = q2cSchema.table('billing_plan_amendments', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  billingPlanId: uuid('billing_plan_id').notNull().references(() => billingPlans.id),
+  effectiveDate: timestamp('effective_date', { withTimezone: true }).notNull(),
+  amendmentType: text('amendment_type').notNull(),
+  changes: jsonb('changes').notNull(),
+  priorVersion: integer('prior_version').notNull(),
+  newVersion: integer('new_version').notNull(),
+  notes: text('notes'),
+  approvedBy: uuid('approved_by'),
+  approvedAt: timestamp('approved_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  createdBy: uuid('created_by'),
 });
 
 // Revenue Recognition tables live in src/q2c/rev-rec.schema.ts (avoids circular import).

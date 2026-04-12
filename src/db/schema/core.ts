@@ -239,6 +239,54 @@ export const userRoles = coreSchema.table('user_roles', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+// ── Document Templates ────────────────────────────────────────────
+
+export const documentTemplates = coreSchema.table('document_templates', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  templateType: text('template_type').notNull(),
+  name: text('name').notNull(),
+  description: text('description'),
+  htmlContent: text('html_content').notNull(),
+  variables: jsonb('variables'),
+  isDefault: boolean('is_default').notNull().default(false),
+  isActive: boolean('is_active').notNull().default(true),
+  version: integer('version').notNull().default(1),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  createdBy: uuid('created_by'),
+  updatedBy: uuid('updated_by'),
+});
+
+// ── Segregation of Duties Rules ───────────────────────────────────
+
+export const sodRules = coreSchema.table('sod_rules', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  ruleKey: text('rule_key').notNull(),
+  description: text('description').notNull(),
+  entityType: text('entity_type').notNull(),
+  actionA: text('action_a').notNull(),
+  actionB: text('action_b').notNull(),
+  isActive: boolean('is_active').notNull().default(true),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// ── Workflow Triggers ─────────────────────────────────────────────
+
+export const workflowTriggers = coreSchema.table('workflow_triggers', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  workflowId: uuid('workflow_id').notNull().references(() => workflowDefinitions.id),
+  triggerType: text('trigger_type').notNull(),
+  entityType: text('entity_type').notNull(),
+  conditions: jsonb('conditions'),
+  actions: jsonb('actions'),
+  isActive: boolean('is_active').notNull().default(true),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const attachments = coreSchema.table('attachments', {
   id: uuid('id').defaultRandom().primaryKey(),
   tenantId: uuid('tenant_id').notNull(),

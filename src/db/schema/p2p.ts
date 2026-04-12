@@ -1,4 +1,4 @@
-import { pgSchema, uuid, text, integer, timestamp } from 'drizzle-orm/pg-core';
+import { pgSchema, uuid, text, integer, timestamp, boolean } from 'drizzle-orm/pg-core';
 
 export const p2pSchema = pgSchema('drydock_p2p');
 
@@ -112,6 +112,22 @@ export const receiptLines = p2pSchema.table('receipt_lines', {
   notes: text('notes'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// ── PO Matching Rules ─────────────────────────────────────────────
+
+export const poMatchingRules = p2pSchema.table('po_matching_rules', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  vendorId: uuid('vendor_id'),
+  priceTolerance: integer('price_tolerance_pct').notNull().default(0),
+  qtyTolerance: integer('qty_tolerance_pct').notNull().default(0),
+  allowOverReceipt: boolean('allow_over_receipt').notNull().default(false),
+  isActive: boolean('is_active').notNull().default(true),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  createdBy: uuid('created_by'),
+  updatedBy: uuid('updated_by'),
 });
 
 // ── Email Log ─────────────────────────────────────────────────
