@@ -295,7 +295,7 @@ describe('Credit Memo Routes', () => {
         arAccountId: AR_ACCOUNT_ID,
       };
       const openPeriod = { id: PERIOD_ID, tenantId: TENANT_ID, status: 'open' };
-      setupSelectSequence([[memo], [openPeriod], []]);
+      setupSelectSequence([[memo], [openPeriod]]);
       mocks.createJournalEntry.mockResolvedValueOnce({
         ok: false,
         error: { code: 'INTERNAL', message: 'GL error' },
@@ -304,7 +304,7 @@ describe('Credit Memo Routes', () => {
       const res = await app.inject({
         method: 'POST',
         url: `/${MEMO_ID}/actions/approve`,
-        payload: { periodId: PERIOD_ID },
+        payload: { periodId: PERIOD_ID, debitAccountId: DEBIT_ACCOUNT_ID, creditAccountId: CREDIT_ACCOUNT_ID },
       });
       expect(res.statusCode).toBe(500);
     });

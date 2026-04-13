@@ -1,4 +1,4 @@
-import { pgSchema, uuid, text, boolean, jsonb, integer, timestamp } from 'drizzle-orm/pg-core';
+import { pgSchema, uuid, text, boolean, jsonb, integer, timestamp, bigint, numeric, date } from 'drizzle-orm/pg-core';
 
 export const integrationSchema = pgSchema('drydock_integration');
 
@@ -47,6 +47,39 @@ export const integrationErrorQueue = integrationSchema.table('integration_error_
   status: text('status').notNull().default('pending'),
   resolvedAt: timestamp('resolved_at', { withTimezone: true }),
   resolvedBy: uuid('resolved_by'),
+});
+
+export const harvestTimeEntries = integrationSchema.table('harvest_time_entries', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').notNull(),
+  harvestEntryId: bigint('harvest_entry_id', { mode: 'number' }).notNull(),
+  harvestUserId: bigint('harvest_user_id', { mode: 'number' }).notNull(),
+  harvestProjectId: bigint('harvest_project_id', { mode: 'number' }).notNull(),
+  harvestTaskId: bigint('harvest_task_id', { mode: 'number' }),
+  harvestClientId: bigint('harvest_client_id', { mode: 'number' }),
+  userName: text('user_name').notNull().default(''),
+  userEmail: text('user_email').notNull().default(''),
+  projectName: text('project_name').notNull().default(''),
+  projectCode: text('project_code').notNull().default(''),
+  taskName: text('task_name').notNull().default(''),
+  clientName: text('client_name').notNull().default(''),
+  spentDate: date('spent_date').notNull(),
+  hours: numeric('hours', { precision: 8, scale: 2 }).notNull().default('0'),
+  roundedHours: numeric('rounded_hours', { precision: 8, scale: 2 }).notNull().default('0'),
+  billable: boolean('billable').notNull().default(false),
+  billableRateCents: integer('billable_rate_cents').notNull().default(0),
+  costRateCents: integer('cost_rate_cents').notNull().default(0),
+  isBilled: boolean('is_billed').notNull().default(false),
+  isLocked: boolean('is_locked').notNull().default(false),
+  notes: text('notes'),
+  externalRefId: text('external_ref_id').notNull().default(''),
+  externalRefUrl: text('external_ref_url').notNull().default(''),
+  startedTime: text('started_time'),
+  endedTime: text('ended_time'),
+  internalProjectId: uuid('internal_project_id'),
+  internalEmployeeId: uuid('internal_employee_id'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
 export const externalKeyMappings = integrationSchema.table('external_key_mappings', {

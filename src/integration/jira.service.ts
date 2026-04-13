@@ -26,6 +26,7 @@ import {
   getMyself,
   searchProjects,
   searchIssues,
+  searchIssuesPost,
   getIssueWorklogs,
   getProjectStatuses,
   JiraApiError,
@@ -417,58 +418,64 @@ export async function syncJiraIssues(
       return ok({ syncLogId: syncLogId!, recordsProcessed: 0, recordsFailed: 0, errors: ['No JIRA projects mapped'] });
     }
 
-    // Fetch issues for all linked JIRA projects
+    // Fetch issues in batches of 20 projects to keep JQL manageable.
+    // Uses POST /rest/api/3/search/jql (new endpoint) with nextPageToken pagination.
     const projectKeys = projectMappings.map((m) => m.externalId);
-    const jql = `project in (${projectKeys.map((k) => `"${k}"`).join(',')}) ORDER BY created DESC`;
-
-    let startAt = 0;
+    const PROJECT_BATCH_SIZE = 20;
     const maxResults = 50;
-    let hasMore = true;
 
-    while (hasMore) {
-      const page = await searchIssues(config.host, config.email, apiToken, jql, startAt, maxResults);
-      const issues = page.issues ?? [];
+    for (let batchStart = 0; batchStart < projectKeys.length; batchStart += PROJECT_BATCH_SIZE) {
+      const batchKeys = projectKeys.slice(batchStart, batchStart + PROJECT_BATCH_SIZE);
+      const jql = `project in (${batchKeys.map((k) => `"${k}"`).join(',')}) ORDER BY created DESC`;
 
-      for (const issue of issues) {
-        try {
-          const existingId = await findExternalMapping(
-            tenantId, 'jira', 'jira_issue', issue.id, 'work_order',
-          );
+      let nextPageToken: string | undefined;
+      let hasMore = true;
 
-          if (!existingId && config.autoCreateWorkOrders) {
-            const numResult = await generateNumber(tenantId, 'work_order');
-            const workOrderNumber = numResult.ok ? numResult.value : `JIRA-${issue.key}`;
+      while (hasMore) {
+        const page = await searchIssuesPost(config.host, config.email, apiToken, jql, maxResults, nextPageToken);
+        const issues = page.issues ?? [];
 
-            const newRows = await db
-              .insert(workOrders)
-              .values({
-                tenantId,
-                workOrderNumber,
-                title: issue.fields.summary,
-                type: 'maintenance',
-                priority: 'normal',
-                status: 'open',
-                isActive: true,
-              })
-              .returning();
+        for (const issue of issues) {
+          try {
+            const existingId = await findExternalMapping(
+              tenantId, 'jira', 'jira_issue', issue.id, 'work_order',
+            );
 
-            const newWO = newRows[0];
-            if (newWO) {
-              await insertKeyMapping(tenantId, 'jira', 'jira_issue', issue.id, 'work_order', newWO.id);
+            if (!existingId && config.autoCreateWorkOrders) {
+              const numResult = await generateNumber(tenantId, 'work_order');
+              const workOrderNumber = numResult.ok ? numResult.value : `JIRA-${issue.key}`;
+
+              const newRows = await db
+                .insert(workOrders)
+                .values({
+                  tenantId,
+                  workOrderNumber,
+                  title: issue.fields.summary,
+                  type: 'maintenance',
+                  priority: 'normal',
+                  status: 'open',
+                  isActive: true,
+                })
+                .returning();
+
+              const newWO = newRows[0];
+              if (newWO) {
+                await insertKeyMapping(tenantId, 'jira', 'jira_issue', issue.id, 'work_order', newWO.id);
+              }
             }
+
+            processed++;
+          } catch (e) {
+            failed++;
+            errors.push(`Issue ${issue.key}: ${e instanceof Error ? e.message : String(e)}`);
           }
-
-          processed++;
-        } catch (e) {
-          failed++;
-          errors.push(`Issue ${issue.key}: ${e instanceof Error ? e.message : String(e)}`);
         }
+
+        hasMore = !page.isLast && issues.length > 0;
+        nextPageToken = page.nextPageToken;
+
+        if (issues.length === 0) break;
       }
-
-      hasMore = issues.length === maxResults && startAt + issues.length < page.total;
-      startAt += issues.length;
-
-      if (issues.length === 0) break;
     }
   } catch (e) {
     failed++;

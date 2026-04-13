@@ -99,7 +99,7 @@ export async function generateQuotePdf(
     return ok(Buffer.from(pdfBuffer));
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
-    return err({ code: 'INTERNAL', message: 'Quote PDF generation failed', details: { error: message } });
+    return err({ code: 'INTERNAL', message: 'PDF generation failed', details: { error: message } });
   }
 }
 

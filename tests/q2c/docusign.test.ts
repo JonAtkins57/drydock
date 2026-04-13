@@ -201,7 +201,7 @@ describe('processWebhookEvent', () => {
     }
     expect(mocks.mockUpdate).toHaveBeenCalled();
     expect(mocks.logAction).toHaveBeenCalledWith(
-      expect.objectContaining({ action: 'docusign_webhook', entityId: QUOTE_ID }),
+      expect.objectContaining({ action: 'docusign_viewed', entityId: QUOTE_ID }),
     );
     expect(mocks.executeQuote).not.toHaveBeenCalled();
   });

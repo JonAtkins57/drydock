@@ -108,7 +108,7 @@ export async function inventoryRoutes(fastify: FastifyInstance): Promise<void> {
 
   // ── Inventory Item Balances ─────────────────────────────────────────
 
-  fastify.get('/inventory', async (request: FastifyRequest, reply: FastifyReply) => {
+  fastify.get('/items', async (request: FastifyRequest, reply: FastifyReply) => {
     const query = listQuerySchema.safeParse(request.query);
     if (!query.success) {
       return reply.status(422).send({
@@ -149,7 +149,7 @@ export async function inventoryRoutes(fastify: FastifyInstance): Promise<void> {
     return reply.send({ data: rows, meta: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) } });
   });
 
-  fastify.get('/inventory/:itemId', async (request: FastifyRequest<{ Params: { itemId: string } }>, reply: FastifyReply) => {
+  fastify.get('/items/:itemId', async (request: FastifyRequest<{ Params: { itemId: string } }>, reply: FastifyReply) => {
     const { tenantId } = request.currentUser;
     const { itemId } = request.params;
 
@@ -175,7 +175,7 @@ export async function inventoryRoutes(fastify: FastifyInstance): Promise<void> {
 
   // ── Inventory Transactions ──────────────────────────────────────────
 
-  fastify.get('/inventory/transactions', async (request: FastifyRequest, reply: FastifyReply) => {
+  fastify.get('/transactions', async (request: FastifyRequest, reply: FastifyReply) => {
     const query = listQuerySchema.safeParse(request.query);
     if (!query.success) {
       return reply.status(422).send({
@@ -207,7 +207,7 @@ export async function inventoryRoutes(fastify: FastifyInstance): Promise<void> {
   //   4. avg cost formula: weighted average on receipt
   //   5. issue: 422 stock check before entering the transaction
   //   6. totalCost sign: negative for issue, positive otherwise
-  fastify.post('/inventory/transactions', async (request: FastifyRequest, reply: FastifyReply) => {
+  fastify.post('/transactions', async (request: FastifyRequest, reply: FastifyReply) => {
     const parsed = createTransactionSchema.safeParse(request.body);
     if (!parsed.success) {
       return reply.status(422).send({
@@ -500,7 +500,7 @@ export async function inventoryRoutes(fastify: FastifyInstance): Promise<void> {
 
   // ── Inventory Adjustments ─────────────────────────────────────────
 
-  fastify.get('/inventory/adjustments', async (request: FastifyRequest, reply: FastifyReply) => {
+  fastify.get('/adjustments', async (request: FastifyRequest, reply: FastifyReply) => {
     const query = listQuerySchema.safeParse(request.query);
     if (!query.success) {
       return reply.status(422).send({
@@ -524,7 +524,7 @@ export async function inventoryRoutes(fastify: FastifyInstance): Promise<void> {
     return reply.send({ data: rows, meta: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) } });
   });
 
-  fastify.post('/inventory/adjustments', async (request: FastifyRequest, reply: FastifyReply) => {
+  fastify.post('/adjustments', async (request: FastifyRequest, reply: FastifyReply) => {
     const parsed = createAdjustmentSchema.safeParse(request.body);
     if (!parsed.success) {
       return reply.status(422).send({

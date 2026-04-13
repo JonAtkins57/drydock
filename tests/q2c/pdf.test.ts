@@ -187,6 +187,8 @@ function setupSelectSequence(responses: unknown[][]) {
     chain['limit'] = vi.fn().mockResolvedValue(resp);
     chain['offset'] = vi.fn().mockReturnValue(chain);
     chain['orderBy'] = vi.fn().mockReturnValue(chain);
+    // Make chain directly awaitable (for queries without .limit())
+    chain['then'] = vi.fn().mockImplementation((resolve: (v: unknown) => void) => resolve(resp));
     return chain;
   });
 }

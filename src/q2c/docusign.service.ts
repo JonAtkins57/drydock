@@ -119,11 +119,14 @@ export async function processWebhookEvent(
 
   // Auto-execute quote on DocuSign completion — goes through quoteService
   // so that the sales order is created and audit is logged consistently.
-  if (envelopeStatus === 'completed' && quote.status === 'sent') {
+  const wasExecuted = envelopeStatus === 'completed' && quote.status === 'sent';
+  if (wasExecuted) {
     const execResult = await quoteService.executeQuote(quote.tenantId, quote.id, 'system');
     if (!execResult.ok) {
       return err(execResult.error);
     }
+    // executeQuote logs its own audit entry — skip duplicate logAction below
+    return ok({ quoteId: quote.id, docusignStatus: envelopeStatus, s3Key });
   }
 
   await logAction({

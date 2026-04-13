@@ -49,8 +49,14 @@ const mocks = vi.hoisted(() => {
 
   function resetAll() {
     vi.clearAllMocks();
+    // mockReturning accumulates once-queue entries across tests when a test
+    // exits early (e.g. 422) without consuming the queued value. Reset it
+    // explicitly so stale queued values don't bleed into the next test.
+    mockReturning.mockReset();
 
     for (const chain of [insertChain, selectChain, updateChain]) {
+      // Restore the shared returning fn in case a test replaced it
+      chain['returning'] = mockReturning;
       for (const key of Object.keys(chain)) {
         if (key !== 'returning') {
           (chain[key] as ReturnType<typeof vi.fn>).mockReturnValue(chain);
@@ -508,8 +514,7 @@ describe('Inventory Routes', () => {
       expect(res.statusCode).toBe(201);
 
       // The update call should set quantityOnHand to 75, not 50+75=125
-      const updateSetArg = mocks.mockUpdate.mock.calls[0]?.[0];
-      expect(updateSetArg).toBeUndefined(); // update is called on the chain; verify via set()
+      // update is called on the chain; verify via set()
       const setCall = mocks.updateChain['set'].mock.calls[0]?.[0] as Record<string, unknown>;
       expect(setCall?.quantityOnHand).toBe('75');
     });

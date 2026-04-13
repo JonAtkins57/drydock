@@ -105,11 +105,45 @@ async function jiraFetch<T>(url: string, email: string, apiToken: string): Promi
   throw lastError ?? new JiraApiError(429, 'JIRA rate limit exceeded after retries');
 }
 
+async function jiraPost<T>(url: string, email: string, apiToken: string, body: unknown): Promise<T> {
+  let lastError: Error | null = null;
+
+  for (let attempt = 0; attempt <= RETRY_DELAYS.length; attempt++) {
+    if (attempt > 0) {
+      await new Promise((resolve) => setTimeout(resolve, RETRY_DELAYS[attempt - 1]));
+    }
+
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        Authorization: authHeader(email, apiToken),
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (res.status === 429 && attempt < RETRY_DELAYS.length) {
+      lastError = new JiraApiError(429, 'JIRA rate limit exceeded, retrying...');
+      continue;
+    }
+
+    if (!res.ok) {
+      const responseBody = await res.text().catch(() => '');
+      throw new JiraApiError(res.status, `JIRA API error ${res.status}: ${res.statusText}`, responseBody);
+    }
+
+    return res.json() as Promise<T>;
+  }
+
+  throw lastError ?? new JiraApiError(429, 'JIRA rate limit exceeded after retries');
+}
+
 /**
  * GET /rest/api/3/myself
  */
 export async function getMyself(host: string, email: string, apiToken: string): Promise<JiraMyself> {
-  const url = `https://${host}/rest/api/3/myself`;
+  const url = `${host.replace(/\/$/, '')}/rest/api/3/myself`;
   return jiraFetch<JiraMyself>(url, email, apiToken);
 }
 
@@ -125,7 +159,7 @@ export async function searchProjects(
   startAt = 0,
   maxResults = 50,
 ): Promise<{ values: JiraProject[]; total: number; startAt: number; maxResults: number; isLast: boolean }> {
-  const url = `https://${host}/rest/api/3/project/search?startAt=${startAt}&maxResults=${maxResults}`;
+  const url = `${host.replace(/\/$/, '')}/rest/api/3/project/search?startAt=${startAt}&maxResults=${maxResults}`;
   return jiraFetch<{ values: JiraProject[]; total: number; startAt: number; maxResults: number; isLast: boolean }>(
     url,
     email,
@@ -134,7 +168,7 @@ export async function searchProjects(
 }
 
 /**
- * GET /rest/api/3/search (JQL)
+ * GET /rest/api/3/search (JQL) — use for small JQL queries only
  */
 export async function searchIssues(
   host: string,
@@ -150,11 +184,39 @@ export async function searchIssues(
     maxResults: String(maxResults),
     fields: 'summary,status,project,assignee,description',
   });
-  const url = `https://${host}/rest/api/3/search?${params.toString()}`;
+  const url = `${host.replace(/\/$/, '')}/rest/api/3/search?${params.toString()}`;
   return jiraFetch<{ issues: JiraIssue[]; total: number; startAt: number; maxResults: number }>(
     url,
     email,
     apiToken,
+  );
+}
+
+/**
+ * POST /rest/api/3/search/jql — new Jira Cloud search endpoint (replaces deprecated /rest/api/3/search)
+ * Uses nextPageToken-based pagination instead of startAt.
+ * Ref: https://developer.atlassian.com/changelog/#CHANGE-2046
+ */
+export async function searchIssuesPost(
+  host: string,
+  email: string,
+  apiToken: string,
+  jql: string,
+  maxResults = 50,
+  nextPageToken?: string,
+): Promise<{ issues: JiraIssue[]; nextPageToken?: string; isLast: boolean }> {
+  const url = `${host.replace(/\/$/, '')}/rest/api/3/search/jql`;
+  const body: Record<string, unknown> = {
+    jql,
+    maxResults,
+    fields: ['summary', 'status', 'project', 'assignee', 'description'],
+  };
+  if (nextPageToken) body['nextPageToken'] = nextPageToken;
+  return jiraPost<{ issues: JiraIssue[]; nextPageToken?: string; isLast: boolean }>(
+    url,
+    email,
+    apiToken,
+    body,
   );
 }
 
@@ -167,7 +229,7 @@ export async function getIssueWorklogs(
   apiToken: string,
   issueIdOrKey: string,
 ): Promise<{ worklogs: JiraWorklog[]; total: number }> {
-  const url = `https://${host}/rest/api/3/issue/${encodeURIComponent(issueIdOrKey)}/worklog`;
+  const url = `${host.replace(/\/$/, '')}/rest/api/3/issue/${encodeURIComponent(issueIdOrKey)}/worklog`;
   return jiraFetch<{ worklogs: JiraWorklog[]; total: number }>(url, email, apiToken);
 }
 
@@ -181,7 +243,7 @@ export async function getProjectStatuses(
   apiToken: string,
   projectKey: string,
 ): Promise<JiraProjectStatus[]> {
-  const url = `https://${host}/rest/api/3/project/${encodeURIComponent(projectKey)}/statuses`;
+  const url = `${host.replace(/\/$/, '')}/rest/api/3/project/${encodeURIComponent(projectKey)}/statuses`;
   // Response is an array of issue types each containing statuses; flatten to unique statuses
   type StatusesResponse = Array<{ statuses: JiraProjectStatus[] }>;
   const data = await jiraFetch<StatusesResponse>(url, email, apiToken);
